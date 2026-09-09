@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "Task item in Today-To-Do",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "company": { "type": "string" },
+        "ticket": { "type": "string" },
+        "status": { "type": "string" },
+        "urgency": { "type": "string" },
+        "assignees": { "type": "array" },
+        "dueDate": { "type": "string" },
+        "tags": { "type": "array" },
+        "attachments": { "type": "array" },
+        "subtasks": { "type": "array" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "status"]
+    },
+    "TeamMember": {
+      "title": "TeamMember",
+      "description": "Team member assignee",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "avatar": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "AppSetting": {
+      "title": "AppSetting",
+      "description": "Application settings and configurations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "value": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "collections": {
+    "tasks": {
+      "entity": "Task",
+      "description": "Collection of tasks"
+    },
+    "team_members": {
+      "entity": "TeamMember",
+      "description": "Collection of team members"
+    },
+    "app_settings": {
+      "entity": "AppSetting",
+      "description": "Application preferences and integration parameters"
+    }
+  }
+}

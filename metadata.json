@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix Remix Today-To-Do",
+  "description": "Aplicação SPA estilo Kanban e Microsoft Planner para gestão de tarefas e equipes com sincronização Google Sheets, modo claro/escuro, visão em cartões, lista, calendário e relatórios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
