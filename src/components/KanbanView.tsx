@@ -155,13 +155,19 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
       {/* Side-by-side columns layout with smooth horizontal scroll for buckets */}
       <div className="flex flex-row overflow-x-auto gap-4 sm:gap-5 items-start pb-6 min-h-[calc(100vh-200px)]">
         {columns.map((column) => {
-          // Cards classified by urgency: most urgent to least urgent
+          // Classificar os cards (especialmente 'A Fazer') pela data de vencimento depois prioridade
           const columnTasks = tasks
             .filter((t) => t.status === column.id)
             .sort((a, b) => {
-              const diff = (urgencyWeight[b.urgency] || 0) - (urgencyWeight[a.urgency] || 0);
-              if (diff !== 0) return diff;
-              return (a.dueDate || '').localeCompare(b.dueDate || '');
+              // 1. Data de vencimento: mais próximas e vencidas primeiro; com data antes de sem data
+              if (a.dueDate && !b.dueDate) return -1;
+              if (!a.dueDate && b.dueDate) return 1;
+              if (a.dueDate && b.dueDate) {
+                const dateCmp = a.dueDate.localeCompare(b.dueDate);
+                if (dateCmp !== 0) return dateCmp;
+              }
+              // 2. Prioridade / Urgência secundária: urgente > alta > média > baixa
+              return (urgencyWeight[b.urgency] || 0) - (urgencyWeight[a.urgency] || 0);
             });
 
           const ColumnIcon = column.icon;

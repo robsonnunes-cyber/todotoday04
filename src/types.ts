@@ -62,6 +62,7 @@ export interface FilterState {
   companies: string[];
   ticketSearch: string;
   dateFilter: DateFilterOption;
+  dateFilters?: DateFilterOption[];
   customStartDate?: string; // YYYY-MM-DD
   customEndDate?: string;   // YYYY-MM-DD
   selectedMonthYear: string; // 'all' or 'YYYY-MM'

@@ -87,17 +87,23 @@ export const ListView: React.FC<ListViewProps> = ({
     return <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">{info.formattedBR}</span>;
   };
 
-  // Ensure tasks inside every group are strictly sorted by urgency from most urgent to least urgent
-  const sortTasksByUrgency = (taskList: Task[]) => {
+  // Classificar tarefas por data de vencimento e depois prioridade
+  const sortTasksByDefault = (taskList: Task[]) => {
     return [...taskList].sort((a, b) => {
-      const diff = (urgencyWeight[b.urgency] || 0) - (urgencyWeight[a.urgency] || 0);
-      if (diff !== 0) return diff;
-      return (a.dueDate || '').localeCompare(b.dueDate || '');
+      // 1. Data de vencimento primeiro
+      if (a.dueDate && !b.dueDate) return -1;
+      if (!a.dueDate && b.dueDate) return 1;
+      if (a.dueDate && b.dueDate) {
+        const diff = a.dueDate.localeCompare(b.dueDate);
+        if (diff !== 0) return diff;
+      }
+      // 2. Prioridade / Urgência secundária
+      return (urgencyWeight[b.urgency] || 0) - (urgencyWeight[a.urgency] || 0);
     });
   };
 
   const renderGroup = (title: string, groupTasks: Task[]) => {
-    const sortedTasks = sortTasksByUrgency(groupTasks);
+    const sortedTasks = sortTasksByDefault(groupTasks);
 
     return (
       <div key={title} className="mb-6 last:mb-0">

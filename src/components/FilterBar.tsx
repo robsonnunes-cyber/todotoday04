@@ -30,6 +30,14 @@ interface FilterBarProps {
   companyCounts?: Record<string, number>;
   statusCounts?: Record<TaskStatus, number>;
   urgencyCounts?: Record<TaskUrgency, number>;
+  dateCounts?: {
+    overdue: number;
+    today: number;
+    thisWeek: number;
+    nextWeek: number;
+    thisMonth: number;
+    noDate: number;
+  };
   totalTasksCount: number;
   filteredTasksCount: number;
 }
@@ -44,6 +52,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   companyCounts = {},
   statusCounts = { todo: 0, in_progress: 0, done: 0 },
   urgencyCounts = { urgent: 0, high: 0, medium: 0, low: 0 },
+  dateCounts = { overdue: 0, today: 0, thisWeek: 0, nextWeek: 0, thisMonth: 0, noDate: 0 },
   totalTasksCount,
   filteredTasksCount,
 }) => {
@@ -54,38 +63,38 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       value: 'todo', 
       label: 'A Fazer', 
       icon: Circle,
-      activeClass: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-800 font-semibold' 
+      activeClass: 'bg-blue-600 text-white border-blue-600 font-semibold' 
     },
     { 
       value: 'in_progress', 
       label: 'Em Andamento', 
       icon: Clock,
-      activeClass: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800 font-semibold' 
+      activeClass: 'bg-amber-600 text-white border-amber-600 font-semibold' 
     },
     { 
       value: 'done', 
       label: 'Concluído', 
       icon: CheckCircle2,
-      activeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800 font-semibold' 
+      activeClass: 'bg-emerald-600 text-white border-emerald-600 font-semibold' 
     },
   ];
 
   const urgencyOptions: { value: TaskUrgency; label: string; color: string; activeClass: string }[] = [
-    { value: 'urgent', label: 'Urgente', color: 'bg-rose-500', activeClass: 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-800' },
-    { value: 'high', label: 'Alta', color: 'bg-amber-500', activeClass: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800' },
-    { value: 'medium', label: 'Média', color: 'bg-blue-500', activeClass: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-800' },
-    { value: 'low', label: 'Baixa', color: 'bg-emerald-500', activeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800' },
+    { value: 'urgent', label: 'Urgente', color: 'bg-rose-500', activeClass: 'bg-rose-600 text-white border-rose-600' },
+    { value: 'high', label: 'Alta', color: 'bg-amber-500', activeClass: 'bg-amber-600 text-white border-amber-600' },
+    { value: 'medium', label: 'Média', color: 'bg-blue-500', activeClass: 'bg-blue-600 text-white border-blue-600' },
+    { value: 'low', label: 'Baixa', color: 'bg-emerald-500', activeClass: 'bg-emerald-600 text-white border-emerald-600' },
   ];
 
-  const dateFilterOptions: { value: DateFilterOption; label: string }[] = [
+  const dateFilterOptions: { value: DateFilterOption; label: string; count?: number }[] = [
     { value: 'all', label: 'Todas as datas' },
-    { value: 'today', label: '📅 Hoje' },
-    { value: 'this_week', label: 'Esta Semana' },
-    { value: 'this_month', label: 'Este Mês' },
-    { value: 'next_week', label: 'Próxima Semana' },
-    { value: 'overdue', label: '⚠️ Atrasadas' },
+    { value: 'overdue', label: '⚠️ Vencidos', count: dateCounts.overdue },
+    { value: 'today', label: '📅 Hoje', count: dateCounts.today },
+    { value: 'this_week', label: 'Esta Semana', count: dateCounts.thisWeek },
+    { value: 'this_month', label: 'Este Mês', count: dateCounts.thisMonth },
+    { value: 'next_week', label: 'Próxima Semana', count: dateCounts.nextWeek },
+    { value: 'no_date', label: 'Sem Data', count: dateCounts.noDate },
     { value: 'custom', label: '📆 Período...' },
-    { value: 'no_date', label: 'Sem Data' },
   ];
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,11 +145,49 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     onFilterChange({ ...filters, tags: newTags });
   };
 
-  const setDateFilter = (dateFilter: DateFilterOption) => {
-    onFilterChange({ ...filters, dateFilter });
-    if (dateFilter === 'custom' && !isExpanded) {
+  const getActiveDateFilters = (): DateFilterOption[] => {
+    if (filters.dateFilters && filters.dateFilters.length > 0) {
+      return filters.dateFilters.filter(f => f !== 'all');
+    }
+    if (filters.dateFilter && filters.dateFilter !== 'all') {
+      return [filters.dateFilter];
+    }
+    return [];
+  };
+
+  const isDateOptionActive = (optValue: DateFilterOption): boolean => {
+    const current = getActiveDateFilters();
+    if (optValue === 'all') {
+      return current.length === 0;
+    }
+    return current.includes(optValue);
+  };
+
+  const toggleDateFilter = (optValue: DateFilterOption) => {
+    if (optValue === 'all') {
+      onFilterChange({
+        ...filters,
+        dateFilter: 'all',
+        dateFilters: [],
+        customStartDate: '',
+        customEndDate: '',
+      });
+      return;
+    }
+
+    if (optValue === 'custom') {
       setIsExpanded(true);
     }
+
+    const current = getActiveDateFilters();
+    const exists = current.includes(optValue);
+    const updated = exists ? current.filter(x => x !== optValue) : [...current, optValue];
+
+    onFilterChange({
+      ...filters,
+      dateFilter: updated.length === 1 ? updated[0] : (updated.length === 0 ? 'all' : 'all'),
+      dateFilters: updated,
+    });
   };
 
   const resetFilters = () => {
@@ -153,6 +200,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       companies: [],
       ticketSearch: '',
       dateFilter: 'all',
+      dateFilters: [],
       customStartDate: '',
       customEndDate: '',
       sortBy: 'dueDate',
@@ -161,6 +209,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   };
 
   // Count active filters
+  const activeDateFilters = getActiveDateFilters();
   const activeFiltersCount = 
     (filters.search.trim() ? 1 : 0) +
     (filters.ticketSearch.trim() ? 1 : 0) +
@@ -169,7 +218,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     filters.urgencies.length +
     filters.assigneeIds.length +
     filters.tags.length +
-    (filters.dateFilter !== 'all' ? 1 : 0);
+    activeDateFilters.length;
 
   const hasActiveFilters = activeFiltersCount > 0;
 
@@ -177,11 +226,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 transition-colors shadow-xs">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3">
         
-        {/* Main search and quick actions bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+        {/* Row 1: Search, Ticket, Advanced Filter Drawer Toggle & Reset */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
           
           {/* Global Search Input */}
-          <div className="relative flex-1 min-w-[220px]">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input
               id="filter-search-input"
@@ -202,31 +251,28 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             )}
           </div>
 
-          {/* Quick Date Presets & Toggle Advanced Filters */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-            
-            {/* Quick date presets */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
-              {dateFilterOptions.slice(0, 5).map((opt) => {
-                const isActive = filters.dateFilter === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    id={`filter-date-${opt.value}`}
-                    onClick={() => setDateFilter(opt.value)}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
-                      isActive
-                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs font-semibold'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Quick Chamado (Ticket) Input */}
+          <div className="relative w-full sm:w-44 shrink-0">
+            <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={filters.ticketSearch}
+              onChange={handleTicketSearchChange}
+              placeholder="Nº Chamado..."
+              className="w-full pl-8 pr-7 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono transition-all"
+            />
+            {filters.ticketSearch && (
+              <button
+                onClick={() => onFilterChange({ ...filters, ticketSearch: '' })}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
 
-            {/* Toggle Advanced Filters Button */}
+          {/* Toggle Advanced Filters & Reset */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               id="btn-toggle-advanced-filters"
               onClick={() => setIsExpanded(!isExpanded)}
@@ -246,7 +292,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Reset Filters */}
             {hasActiveFilters && (
               <button
                 id="btn-reset-filters"
@@ -258,7 +303,156 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 <span className="hidden sm:inline">Limpar</span>
               </button>
             )}
+          </div>
 
+        </div>
+
+        {/* Row 2: DYNAMIC FILTER BUTTONS WITH MULTI-SELECTION AND 'VENCIDOS' BUTTON */}
+        <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          
+          {/* Section: Prazos / Datas (Multi-seleção dinâmica com botão Vencidos) */}
+          <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl shrink-0 border border-slate-200/60 dark:border-slate-700/60">
+            <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 px-1.5 flex items-center gap-1 select-none">
+              <Calendar className="w-3 h-3 text-slate-400" />
+              Prazos:
+            </span>
+            {dateFilterOptions.slice(0, 7).map((opt) => {
+              const isActive = isDateOptionActive(opt.value);
+              const count = opt.count;
+              const isOverdue = opt.value === 'overdue';
+              const isToday = opt.value === 'today';
+
+              let btnClasses = 'px-2 py-1 text-xs font-medium rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ';
+              if (isActive) {
+                if (isOverdue) {
+                  btnClasses += 'bg-rose-600 text-white shadow-xs font-semibold ring-2 ring-rose-500/30';
+                } else if (isToday) {
+                  btnClasses += 'bg-amber-500 text-white shadow-xs font-semibold ring-2 ring-amber-500/30';
+                } else if (opt.value === 'all') {
+                  btnClasses += 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs font-semibold';
+                } else {
+                  btnClasses += 'bg-blue-600 text-white shadow-xs font-semibold ring-2 ring-blue-500/30';
+                }
+              } else {
+                if (isOverdue && count && count > 0) {
+                  btnClasses += 'text-rose-600 dark:text-rose-400 hover:bg-rose-100/80 dark:hover:bg-rose-950/70 font-semibold bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60';
+                } else {
+                  btnClasses += 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-700/80';
+                }
+              }
+
+              return (
+                <button
+                  key={opt.value}
+                  id={`filter-date-${opt.value}`}
+                  onClick={() => toggleDateFilter(opt.value)}
+                  className={btnClasses}
+                  title={`Filtrar por ${opt.label} (permite múltipla seleção)`}
+                >
+                  <span>{opt.label}</span>
+                  {count !== undefined && count > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isActive 
+                        ? 'bg-white/25 text-white' 
+                        : isOverdue 
+                        ? 'bg-rose-200 text-rose-800 dark:bg-rose-900 dark:text-rose-200' 
+                        : 'bg-slate-200/90 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Divider */}
+          <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
+
+          {/* Section: Status (Multi-seleção rápida na barra superior) */}
+          <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl shrink-0 border border-slate-200/60 dark:border-slate-700/60">
+            <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 px-1.5 flex items-center gap-1 select-none">
+              <CheckCircle2 className="w-3 h-3 text-slate-400" />
+              Status:
+            </span>
+            {statusOptions.map((st) => {
+              const isSelected = filters.statuses.includes(st.value);
+              const Icon = st.icon;
+              const count = statusCounts[st.value] || 0;
+
+              return (
+                <button
+                  key={st.value}
+                  id={`quick-status-${st.value}`}
+                  onClick={() => toggleStatus(st.value)}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg whitespace-nowrap transition-all ${
+                    isSelected
+                      ? st.value === 'todo'
+                        ? 'bg-blue-600 text-white font-semibold shadow-xs ring-2 ring-blue-500/20'
+                        : st.value === 'in_progress'
+                        ? 'bg-amber-600 text-white font-semibold shadow-xs ring-2 ring-amber-500/20'
+                        : 'bg-emerald-600 text-white font-semibold shadow-xs ring-2 ring-emerald-500/20'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-700/80'
+                  }`}
+                  title={`Filtrar por status ${st.label} (permite múltipla seleção)`}
+                >
+                  <Icon className="w-3 h-3" />
+                  <span>{st.label}</span>
+                  {count > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/90 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Divider */}
+          <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
+
+          {/* Section: Prioridade / Urgência (Multi-seleção rápida na barra superior) */}
+          <div className="flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl shrink-0 border border-slate-200/60 dark:border-slate-700/60">
+            <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 px-1.5 flex items-center gap-1 select-none">
+              <AlertCircle className="w-3 h-3 text-slate-400" />
+              Prioridade:
+            </span>
+            {urgencyOptions.map((opt) => {
+              const isSelected = filters.urgencies.includes(opt.value);
+              const count = urgencyCounts[opt.value] || 0;
+
+              return (
+                <button
+                  key={opt.value}
+                  id={`quick-urgency-${opt.value}`}
+                  onClick={() => toggleUrgency(opt.value)}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg whitespace-nowrap transition-all ${
+                    isSelected
+                      ? opt.value === 'urgent'
+                        ? 'bg-rose-600 text-white font-semibold shadow-xs ring-2 ring-rose-500/20'
+                        : opt.value === 'high'
+                        ? 'bg-amber-600 text-white font-semibold shadow-xs ring-2 ring-amber-500/20'
+                        : opt.value === 'medium'
+                        ? 'bg-blue-600 text-white font-semibold shadow-xs ring-2 ring-blue-500/20'
+                        : 'bg-emerald-600 text-white font-semibold shadow-xs ring-2 ring-emerald-500/20'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-700/80'
+                  }`}
+                  title={`Filtrar por prioridade ${opt.label} (permite múltipla seleção)`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : opt.color}`} />
+                  <span>{opt.label}</span>
+                  {count > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isSelected ? 'bg-white/25 text-white' : 'bg-slate-200/90 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
         </div>
@@ -392,23 +586,36 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               </span>
             ))}
 
-            {/* Date/Period Filter Pill */}
-            {filters.dateFilter !== 'all' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700">
-                <CalendarRange className="w-3 h-3 text-blue-500" />
-                <span>
-                  {filters.dateFilter === 'custom' 
-                    ? `Período: ${filters.customStartDate ? formatToBRDate(filters.customStartDate) : 'Início'} até ${filters.customEndDate ? formatToBRDate(filters.customEndDate) : 'Fim'}`
-                    : dateFilterOptions.find(d => d.value === filters.dateFilter)?.label || filters.dateFilter}
-                </span>
-                <button
-                  onClick={() => onFilterChange({ ...filters, dateFilter: 'all', customStartDate: '', customEndDate: '' })}
-                  className="hover:text-rose-500 p-0.5"
+            {/* Date/Period Filter Pills (Multi-selection) */}
+            {activeDateFilters.map((df) => {
+              const opt = dateFilterOptions.find(d => d.value === df);
+              const label = df === 'custom' 
+                ? `Período: ${filters.customStartDate ? formatToBRDate(filters.customStartDate) : 'Início'} até ${filters.customEndDate ? formatToBRDate(filters.customEndDate) : 'Fim'}`
+                : opt?.label || df;
+
+              return (
+                <span 
+                  key={df}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs border font-medium ${
+                    df === 'overdue'
+                      ? 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-800'
+                      : df === 'today'
+                      ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+                  }`}
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
+                  <CalendarRange className="w-3 h-3 text-blue-500" />
+                  <span>{label}</span>
+                  <button
+                    onClick={() => toggleDateFilter(df)}
+                    className="hover:text-rose-500 p-0.5"
+                    title="Remover filtro"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              );
+            })}
 
             {/* Clear All Link */}
             <button
@@ -554,25 +761,42 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex flex-wrap items-center gap-1">
                   {dateFilterOptions.map((opt) => {
-                    const isSelected = filters.dateFilter === opt.value;
+                    const isSelected = isDateOptionActive(opt.value);
+                    const isOverdue = opt.value === 'overdue';
+                    const isToday = opt.value === 'today';
+                    const count = opt.count;
+
                     return (
                       <button
                         key={opt.value}
-                        onClick={() => setDateFilter(opt.value)}
-                        className={`px-2 py-1 text-xs rounded-lg border transition-all ${
+                        onClick={() => toggleDateFilter(opt.value)}
+                        className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border transition-all ${
                           isSelected
-                            ? 'bg-blue-100 text-blue-900 border-blue-400 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-700 font-semibold'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                            ? isOverdue
+                              ? 'bg-rose-600 text-white border-rose-600 font-semibold shadow-2xs'
+                              : isToday
+                              ? 'bg-amber-500 text-white border-amber-500 font-semibold shadow-2xs'
+                              : 'bg-blue-600 text-white border-blue-600 font-semibold shadow-2xs'
+                            : isOverdue && count && count > 0
+                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/60 font-semibold hover:bg-rose-100'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300'
                         }`}
                       >
-                        {opt.label}
+                        <span>{opt.label}</span>
+                        {count !== undefined && count > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                            isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                          }`}>
+                            {count}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
 
                 {/* Custom Date Range Inputs (Aparece se selecionado ou configurado) */}
-                {filters.dateFilter === 'custom' && (
+                {isDateOptionActive('custom') && (
                   <div className="flex items-center gap-1.5 bg-blue-50/60 dark:bg-blue-950/40 p-1.5 rounded-lg border border-blue-200 dark:border-blue-800 animate-fadeIn">
                     <span className="text-[11px] text-slate-600 dark:text-slate-400">De:</span>
                     <input

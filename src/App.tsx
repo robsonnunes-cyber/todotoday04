@@ -18,7 +18,7 @@ import {
 } from './types';
 import { INITIAL_TASKS, INITIAL_ASSIGNEES, PREDEFINED_TAGS } from './data/initialData';
 import { checkAndNotifyUrgentTasks, playNotificationSound } from './services/notificationService';
-import { calculateNextDueDate, formatToBRDate } from './utils/dateUtils';
+import { calculateNextDueDate, formatToBRDate, normalizeToISODate } from './utils/dateUtils';
 
 // Subcomponents
 import { Navbar } from './components/Navbar';
@@ -117,6 +117,7 @@ export default function App() {
     companies: [],
     ticketSearch: '',
     dateFilter: 'all',
+    dateFilters: [],
     customStartDate: '',
     customEndDate: '',
     sortBy: 'dueDate',
@@ -378,10 +379,64 @@ export default function App() {
     return counts;
   }, [tasks]);
 
+  // Dynamic counts for date options (vencidos, hoje, esta semana, etc.)
+  const dateCounts = useMemo(() => {
+    const now = new Date();
+    const todayStr = normalizeToISODate(now);
+    const currentYearMonth = todayStr.substring(0, 7);
+
+    const dayOfWeek = now.getDay();
+    const diffToMonday = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    const mondayDate = new Date(now);
+    mondayDate.setDate(diffToMonday);
+    const sundayDate = new Date(mondayDate);
+    sundayDate.setDate(mondayDate.getDate() + 6);
+    const thisWeekStart = normalizeToISODate(mondayDate);
+    const thisWeekEnd = normalizeToISODate(sundayDate);
+
+    const nextMondayDate = new Date(mondayDate);
+    nextMondayDate.setDate(mondayDate.getDate() + 7);
+    const nextSundayDate = new Date(nextMondayDate);
+    nextSundayDate.setDate(nextMondayDate.getDate() + 6);
+    const nextWeekStart = normalizeToISODate(nextMondayDate);
+    const nextWeekEnd = normalizeToISODate(nextSundayDate);
+
+    let overdue = 0;
+    let today = 0;
+    let thisWeek = 0;
+    let nextWeek = 0;
+    let thisMonth = 0;
+    let noDate = 0;
+
+    tasks.forEach(t => {
+      const isDone = t.status === 'done';
+      if (!isDone && t.dueDate && t.dueDate < todayStr) {
+        overdue++;
+      }
+      if (t.dueDate === todayStr) {
+        today++;
+      }
+      if (t.dueDate && t.dueDate >= thisWeekStart && t.dueDate <= thisWeekEnd) {
+        thisWeek++;
+      }
+      if (t.dueDate && t.dueDate >= nextWeekStart && t.dueDate <= nextWeekEnd) {
+        nextWeek++;
+      }
+      if (t.dueDate && t.dueDate.startsWith(currentYearMonth)) {
+        thisMonth++;
+      }
+      if (!t.dueDate) {
+        noDate++;
+      }
+    });
+
+    return { overdue, today, thisWeek, nextWeek, thisMonth, noDate };
+  }, [tasks]);
+
   // Filtered and sorted tasks
   const filteredTasks = useMemo(() => {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = normalizeToISODate(now);
     const currentYearMonth = todayStr.substring(0, 7);
     
     // Week calculation (Monday to Sunday)
@@ -391,16 +446,16 @@ export default function App() {
     mondayDate.setDate(diffToMonday);
     const sundayDate = new Date(mondayDate);
     sundayDate.setDate(mondayDate.getDate() + 6);
-    const thisWeekStart = mondayDate.toISOString().split('T')[0];
-    const thisWeekEnd = sundayDate.toISOString().split('T')[0];
+    const thisWeekStart = normalizeToISODate(mondayDate);
+    const thisWeekEnd = normalizeToISODate(sundayDate);
 
     // Next week calculation
     const nextMondayDate = new Date(mondayDate);
     nextMondayDate.setDate(mondayDate.getDate() + 7);
     const nextSundayDate = new Date(nextMondayDate);
     nextSundayDate.setDate(nextMondayDate.getDate() + 6);
-    const nextWeekStart = nextMondayDate.toISOString().split('T')[0];
-    const nextWeekEnd = nextSundayDate.toISOString().split('T')[0];
+    const nextWeekStart = normalizeToISODate(nextMondayDate);
+    const nextWeekEnd = normalizeToISODate(nextSundayDate);
 
     return tasks.filter(task => {
       // Search filter
@@ -454,39 +509,67 @@ export default function App() {
         if (!hasTag) return false;
       }
 
-      // Date / Period Filter
-      if (filters.dateFilter === 'overdue') {
-        if (task.status === 'done' || !task.dueDate || task.dueDate >= todayStr) return false;
-      } else if (filters.dateFilter === 'today') {
-        if (task.dueDate !== todayStr) return false;
-      } else if (filters.dateFilter === 'this_week') {
-        if (!task.dueDate || task.dueDate < thisWeekStart || task.dueDate > thisWeekEnd) return false;
-      } else if (filters.dateFilter === 'this_month') {
-        if (!task.dueDate || !task.dueDate.startsWith(currentYearMonth)) return false;
-      } else if (filters.dateFilter === 'next_week') {
-        if (!task.dueDate || task.dueDate < nextWeekStart || task.dueDate > nextWeekEnd) return false;
-      } else if (filters.dateFilter === 'custom') {
-        if (filters.customStartDate && (!task.dueDate || task.dueDate < filters.customStartDate)) {
+      // Date / Period Filter supporting multi-selection
+      const activeDateFilters = (filters.dateFilters && filters.dateFilters.length > 0)
+        ? filters.dateFilters.filter(f => f !== 'all')
+        : (filters.dateFilter && filters.dateFilter !== 'all' ? [filters.dateFilter] : []);
+
+      if (activeDateFilters.length > 0) {
+        const matchesAnyDate = activeDateFilters.some(df => {
+          if (df === 'overdue') {
+            return task.status !== 'done' && Boolean(task.dueDate) && task.dueDate < todayStr;
+          }
+          if (df === 'today') {
+            return task.dueDate === todayStr;
+          }
+          if (df === 'this_week') {
+            return Boolean(task.dueDate) && task.dueDate >= thisWeekStart && task.dueDate <= thisWeekEnd;
+          }
+          if (df === 'this_month') {
+            return Boolean(task.dueDate) && task.dueDate.startsWith(currentYearMonth);
+          }
+          if (df === 'next_week') {
+            return Boolean(task.dueDate) && task.dueDate >= nextWeekStart && task.dueDate <= nextWeekEnd;
+          }
+          if (df === 'no_date') {
+            return !task.dueDate;
+          }
+          if (df === 'custom') {
+            if (filters.customStartDate && (!task.dueDate || task.dueDate < filters.customStartDate)) return false;
+            if (filters.customEndDate && (!task.dueDate || task.dueDate > filters.customEndDate)) return false;
+            return true;
+          }
+          return false;
+        });
+
+        if (!matchesAnyDate) {
           return false;
         }
-        if (filters.customEndDate && (!task.dueDate || task.dueDate > filters.customEndDate)) {
-          return false;
-        }
-      } else if (filters.dateFilter === 'no_date') {
-        if (task.dueDate) return false;
       }
 
       return true;
     }).sort((a, b) => {
       const order = filters.sortOrder === 'asc' ? 1 : -1;
+      const priorityRank: Record<TaskUrgency, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
+
       if (filters.sortBy === 'dueDate') {
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return a.dueDate.localeCompare(b.dueDate) * order;
+        // 1. Data de vencimento: com data antes de sem data
+        if (a.dueDate && !b.dueDate) return -1 * order;
+        if (!a.dueDate && b.dueDate) return 1 * order;
+        if (a.dueDate && b.dueDate) {
+          const dateCmp = a.dueDate.localeCompare(b.dueDate) * order;
+          if (dateCmp !== 0) return dateCmp;
+        }
+        // 2. Prioridade / Urgência secundária: urgente primeiro
+        return ((priorityRank[b.urgency] || 0) - (priorityRank[a.urgency] || 0)) * order;
       }
       if (filters.sortBy === 'urgency') {
-        const priorityRank = { urgent: 4, high: 3, medium: 2, low: 1 };
-        return (priorityRank[b.urgency] - priorityRank[a.urgency]) * order;
+        const urgCmp = ((priorityRank[b.urgency] || 0) - (priorityRank[a.urgency] || 0)) * order;
+        if (urgCmp !== 0) return urgCmp;
+        if (a.dueDate && !b.dueDate) return -1;
+        if (!a.dueDate && b.dueDate) return 1;
+        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+        return 0;
       }
       if (filters.sortBy === 'title') {
         return a.title.localeCompare(b.title) * order;
@@ -853,6 +936,7 @@ export default function App() {
           companyCounts={companyCounts}
           statusCounts={statusCounts}
           urgencyCounts={urgencyCounts}
+          dateCounts={dateCounts}
           totalTasksCount={tasks.length}
           filteredTasksCount={filteredTasks.length}
         />
