@@ -47,7 +47,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   const [inlineCompany, setInlineCompany] = useState('');
   const [inlineTicket, setInlineTicket] = useState('');
   const [inlineDueDate, setInlineDueDate] = useState('');
-  const [inlineUrgency, setInlineUrgency] = useState<TaskUrgency>('urgent');
+  const [inlineUrgency, setInlineUrgency] = useState<TaskUrgency>('high');
   const [inlineRecurrence, setInlineRecurrence] = useState<TaskRecurrence>('single');
 
   const columns: {
@@ -144,16 +144,16 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   };
 
   const urgencyWeight: Record<TaskUrgency, number> = {
-    urgent: 4,
     high: 3,
     medium: 2,
     low: 1,
+    urgent: 3,
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+    <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 flex-1 flex flex-col h-full min-h-0 overflow-hidden">
       {/* Side-by-side columns layout with smooth horizontal scroll for buckets */}
-      <div className="flex flex-row overflow-x-auto gap-4 sm:gap-5 items-start pb-6 min-h-[calc(100vh-200px)]">
+      <div className="flex flex-row overflow-x-auto gap-3 sm:gap-4 items-stretch pb-1 h-full min-h-0 flex-1">
         {columns.map((column) => {
           // Classificar os cards (especialmente 'A Fazer') pela data de vencimento depois prioridade
           const columnTasks = tasks
@@ -166,7 +166,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 const dateCmp = a.dueDate.localeCompare(b.dueDate);
                 if (dateCmp !== 0) return dateCmp;
               }
-              // 2. Prioridade / Urgência secundária: urgente > alta > média > baixa
+              // 2. Prioridade / Urgência secundária: alta > média > baixa
               return (urgencyWeight[b.urgency] || 0) - (urgencyWeight[a.urgency] || 0);
             });
 
@@ -185,7 +185,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 isDraggingOver
                   ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 dark:bg-blue-950/20 shadow-md'
                   : 'border-slate-200/80 dark:border-slate-800/90 shadow-2xs'
-              } p-2.5 sm:p-3 min-h-[560px]`}
+              } p-2.5 sm:p-3 h-full max-h-full min-h-0`}
             >
               {/* Microsoft Planner Bucket Header */}
               <div className="flex items-center justify-between gap-2 px-1 py-1 mb-2.5">
@@ -238,7 +238,6 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                         onChange={(e) => setInlineUrgency(e.target.value as TaskUrgency)}
                         className="text-[11px] py-1 px-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300"
                       >
-                        <option value="urgent">Urgente</option>
                         <option value="high">Alta</option>
                         <option value="medium">Média</option>
                         <option value="low">Baixa</option>
@@ -285,8 +284,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 </button>
               )}
 
-              {/* Tasks Cards List - Compact space-y-2 */}
-              <div className="space-y-2 flex-1 flex flex-col">
+              {/* Tasks Cards List - Scrollable internally within column */}
+              <div className="space-y-2 flex-1 overflow-y-auto pr-1 scrollbar-thin min-h-0">
                 {columnTasks.length > 0 ? (
                   columnTasks.map((task) => (
                     <TaskCard

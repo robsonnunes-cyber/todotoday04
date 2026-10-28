@@ -32,9 +32,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tasks, assignees }) =>
 
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  // Urgency distribution
-  const urgentCount = tasks.filter(t => t.urgency === 'urgent').length;
-  const highCount = tasks.filter(t => t.urgency === 'high').length;
+  // Urgency distribution (Alta, Média, Baixa)
+  const highCount = tasks.filter(t => t.urgency === 'high' || t.urgency === 'urgent').length;
   const mediumCount = tasks.filter(t => t.urgency === 'medium').length;
   const lowCount = tasks.filter(t => t.urgency === 'low').length;
 
@@ -142,17 +141,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tasks, assignees }) =>
           </div>
         </div>
 
-        {/* Urgent & High Priority */}
+        {/* Prioridade Alta */}
         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Alta Urgência</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Prioridade Alta</span>
             <AlertOctagon className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mb-1">
-            {urgentCount + highCount}
+            {highCount}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            {urgentCount} urgentes • {highCount} altas
+            {highCount} tarefas com prioridade alta
           </div>
         </div>
 
@@ -243,23 +242,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tasks, assignees }) =>
           {/* Stacked bar */}
           <div className="space-y-4">
             <div className="w-full h-4 rounded-full overflow-hidden flex bg-slate-100 dark:bg-slate-800">
-              {urgentCount > 0 && (
-                <div
-                  className="h-full bg-rose-500 hover:brightness-110 transition-all"
-                  style={{ width: `${(urgentCount / totalTasks) * 100}%` }}
-                  title={`Urgente: ${urgentCount}`}
-                ></div>
-              )}
               {highCount > 0 && (
                 <div
-                  className="h-full bg-amber-500 hover:brightness-110 transition-all"
+                  className="h-full bg-rose-500 hover:brightness-110 transition-all"
                   style={{ width: `${(highCount / totalTasks) * 100}%` }}
                   title={`Alta: ${highCount}`}
                 ></div>
               )}
               {mediumCount > 0 && (
                 <div
-                  className="h-full bg-blue-500 hover:brightness-110 transition-all"
+                  className="h-full bg-amber-500 hover:brightness-110 transition-all"
                   style={{ width: `${(mediumCount / totalTasks) * 100}%` }}
                   title={`Média: ${mediumCount}`}
                 ></div>
@@ -273,18 +265,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ tasks, assignees }) =>
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="grid grid-cols-3 gap-3 text-xs">
               <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/50">
-                <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300">Urgente</span>
-                <div className="text-lg font-black text-rose-800 dark:text-rose-200">{urgentCount}</div>
+                <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300">Alta</span>
+                <div className="text-lg font-black text-rose-800 dark:text-rose-200">{highCount}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/50">
-                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Alta</span>
-                <div className="text-lg font-black text-amber-800 dark:text-amber-200">{highCount}</div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50">
-                <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300">Média</span>
-                <div className="text-lg font-black text-blue-800 dark:text-blue-200">{mediumCount}</div>
+                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Média</span>
+                <div className="text-lg font-black text-amber-800 dark:text-amber-200">{mediumCount}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/50">
                 <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">Baixa</span>

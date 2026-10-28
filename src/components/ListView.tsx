@@ -52,11 +52,10 @@ export const ListView: React.FC<ListViewProps> = ({
   const getUrgencyBadge = (urgency: TaskUrgency) => {
     switch (urgency) {
       case 'urgent':
-        return <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300">Urgente</span>;
       case 'high':
-        return <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">Alta</span>;
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300">Alta</span>;
       case 'medium':
-        return <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300">Média</span>;
+        return <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">Média</span>;
       case 'low':
       default:
         return <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">Baixa</span>;
@@ -421,9 +420,8 @@ export const ListView: React.FC<ListViewProps> = ({
         </>
       ) : groupBy === 'urgency' ? (
         <>
-          {renderGroup('🚨 Urgente', tasks.filter(t => t.urgency === 'urgent'))}
-          {renderGroup('⚠️ Alta', tasks.filter(t => t.urgency === 'high'))}
-          {renderGroup('🔷 Média', tasks.filter(t => t.urgency === 'medium'))}
+          {renderGroup('🔴 Alta', tasks.filter(t => t.urgency === 'high' || t.urgency === 'urgent'))}
+          {renderGroup('🟠 Média', tasks.filter(t => t.urgency === 'medium'))}
           {renderGroup('🟢 Baixa', tasks.filter(t => t.urgency === 'low'))}
         </>
       ) : groupBy === 'recurrence' ? (

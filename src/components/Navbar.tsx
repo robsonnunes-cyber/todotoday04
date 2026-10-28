@@ -49,17 +49,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-2">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14 gap-2">
           
           {/* Logo with Financial Icon & Title */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 via-teal-600 to-blue-700 text-white shadow-sm shadow-emerald-500/20">
-              <CircleDollarSign className="w-5 h-5" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 via-teal-600 to-blue-700 text-white shadow-xs">
+              <CircleDollarSign className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                   Today-To-Do
                 </h1>
               </div>

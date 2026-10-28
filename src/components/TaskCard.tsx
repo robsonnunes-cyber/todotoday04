@@ -67,33 +67,27 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const getUrgencyConfig = (urgency: TaskUrgency) => {
     switch (urgency) {
       case 'urgent':
-        return {
-          label: 'Urgente',
-          icon: AlertOctagon,
-          className: 'text-rose-700 bg-rose-50 border-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/80',
-          dotColor: 'bg-rose-600',
-        };
       case 'high':
         return {
           label: 'Alta',
           icon: AlertTriangle,
-          className: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/80',
-          dotColor: 'bg-amber-500',
+          className: 'text-rose-700 bg-rose-50 border-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/80',
+          dotColor: 'bg-rose-500',
         };
       case 'medium':
         return {
           label: 'Média',
           icon: Clock,
-          className: 'text-blue-700 bg-blue-50 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800/80',
-          dotColor: 'bg-blue-500',
+          className: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/80',
+          dotColor: 'bg-amber-500',
         };
       case 'low':
       default:
         return {
           label: 'Baixa',
           icon: CheckCircle2,
-          className: 'text-slate-600 bg-slate-50 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
-          dotColor: 'bg-slate-400',
+          className: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/80',
+          dotColor: 'bg-emerald-500',
         };
     }
   };

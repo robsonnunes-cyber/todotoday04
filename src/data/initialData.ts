@@ -109,7 +109,7 @@ export const INITIAL_TASKS: Task[] = [
     ticket: 'CHAM-8842',
     description: 'Definir estrutura das tabelas de tarefas e membros com persistência e sincronização em segundo plano transparente.',
     status: 'in_progress',
-    urgency: 'urgent',
+    urgency: 'high',
     assignees: [INITIAL_ASSIGNEES[1], INITIAL_ASSIGNEES[3]],
     dueDate: getDateOffset(0), // Hoje
     tags: ['Banco de Dados', 'Backend', 'Sprint 24'],

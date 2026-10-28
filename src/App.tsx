@@ -372,8 +372,9 @@ export default function App() {
   const urgencyCounts = useMemo(() => {
     const counts: Record<TaskUrgency, number> = { urgent: 0, high: 0, medium: 0, low: 0 };
     tasks.forEach(t => {
-      if (counts[t.urgency] !== undefined) {
-        counts[t.urgency]++;
+      const effectiveUrgency = t.urgency === 'urgent' ? 'high' : t.urgency;
+      if (counts[effectiveUrgency] !== undefined) {
+        counts[effectiveUrgency]++;
       }
     });
     return counts;
@@ -492,9 +493,13 @@ export default function App() {
         return false;
       }
 
-      // Urgency filter
-      if (filters.urgencies.length > 0 && !filters.urgencies.includes(task.urgency)) {
-        return false;
+      // Priority / Urgency filter (Alta, Média, Baixa)
+      if (filters.urgencies.length > 0) {
+        const effectiveUrgency = task.urgency === 'urgent' ? 'high' : task.urgency;
+        const matches = filters.urgencies.includes(effectiveUrgency) || filters.urgencies.includes(task.urgency);
+        if (!matches) {
+          return false;
+        }
       }
 
       // Assignee filter
@@ -584,7 +589,7 @@ export default function App() {
   // Urgent and today tasks count for navbar badge
   const urgentDueCount = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    return tasks.filter(t => t.status !== 'done' && (t.dueDate === todayStr || (t.dueDate && t.dueDate < todayStr) || t.urgency === 'urgent')).length;
+    return tasks.filter(t => t.status !== 'done' && (t.dueDate === todayStr || (t.dueDate && t.dueDate < todayStr) || t.urgency === 'high' || t.urgency === 'urgent')).length;
   }, [tasks]);
 
   // Handlers for Task Operations (CRUD)
@@ -908,7 +913,7 @@ export default function App() {
 
   // 3. Authenticated: Full access to tasks, kanban, metrics and team activities
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 overflow-hidden">
       
       {/* Header Navigation */}
       <Navbar
@@ -942,8 +947,8 @@ export default function App() {
         />
       )}
 
-      {/* Main Viewport Container */}
-      <main className="flex-1">
+      {/* Main Viewport Container (Fits strictly in single screen) */}
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {viewMode === 'kanban' && (
           <KanbanView
             tasks={filteredTasks}
@@ -994,49 +999,57 @@ export default function App() {
         )}
 
         {viewMode === 'list' && (
-          <ListView
-            tasks={filteredTasks}
-            onEditTask={handleOpenEditTask}
-            onDeleteTask={handleDeleteTask}
-            onStatusChange={handleStatusChange}
-            onToggleSubtask={handleToggleSubtask}
-            onAddNewTask={() => handleOpenNewTask('todo')}
-            onToggleRecurrence={handleToggleRecurrence}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <ListView
+              tasks={filteredTasks}
+              onEditTask={handleOpenEditTask}
+              onDeleteTask={handleDeleteTask}
+              onStatusChange={handleStatusChange}
+              onToggleSubtask={handleToggleSubtask}
+              onAddNewTask={() => handleOpenNewTask('todo')}
+              onToggleRecurrence={handleToggleRecurrence}
+            />
+          </div>
         )}
 
         {viewMode === 'calendar' && (
-          <CalendarView
-            tasks={filteredTasks}
-            onEditTask={handleOpenEditTask}
-            onAddNewTaskWithDate={(dateStr) => handleOpenNewTask('todo', dateStr)}
-            onStatusChange={handleStatusChange}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <CalendarView
+              tasks={filteredTasks}
+              onEditTask={handleOpenEditTask}
+              onAddNewTaskWithDate={(dateStr) => handleOpenNewTask('todo', dateStr)}
+              onStatusChange={handleStatusChange}
+            />
+          </div>
         )}
 
         {viewMode === 'reports' && (
-          <ReportsView
-            tasks={tasks}
-            assignees={assignees}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <ReportsView
+              tasks={tasks}
+              assignees={assignees}
+            />
+          </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200/80 dark:border-slate-800/80 py-4 px-6 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xs">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-800 dark:text-slate-200">Today-To-Do</span>
-            <span>•</span>
-            <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-              Sincronização Automática
-            </span>
+      {/* Slim status footer */}
+      {viewMode !== 'kanban' && (
+        <footer className="border-t border-slate-200/80 dark:border-slate-800/80 py-2.5 px-6 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xs shrink-0">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Today-To-Do</span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                Sincronização Automática
+              </span>
+            </div>
+            <div>
+              Gestão de Tarefas & Equipes
+            </div>
           </div>
-          <div>
-            Desenvolvido com React, TypeScript & Tailwind CSS
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Task Create / Edit Modal */}
       <TaskModal

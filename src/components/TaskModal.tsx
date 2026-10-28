@@ -82,7 +82,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setDescription(initialTask.description || '');
       setTicket(initialTask.ticket || '');
       setStatus(initialTask.status || 'todo');
-      setUrgency(initialTask.urgency || 'medium');
+      setUrgency(initialTask.urgency === 'urgent' ? 'high' : (initialTask.urgency || 'medium'));
       setRecurrence(initialTask.recurrence || 'single');
       setSelectedAssignees(initialTask.assignees || []);
       setDueDate(normalizeToISODate(initialTask.dueDate));
@@ -214,9 +214,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   const urgencies: { value: TaskUrgency; label: string; border: string; bg: string; dot: string }[] = [
     { value: 'low', label: 'Baixa', border: 'border-emerald-300 dark:border-emerald-800', bg: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300', dot: 'bg-emerald-500' },
-    { value: 'medium', label: 'Média', border: 'border-blue-300 dark:border-blue-800', bg: 'bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300', dot: 'bg-blue-500' },
-    { value: 'high', label: 'Alta', border: 'border-amber-300 dark:border-amber-800', bg: 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300', dot: 'bg-amber-500' },
-    { value: 'urgent', label: 'Urgente', border: 'border-rose-300 dark:border-rose-800', bg: 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300', dot: 'bg-rose-500' },
+    { value: 'medium', label: 'Média', border: 'border-amber-300 dark:border-amber-800', bg: 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300', dot: 'bg-amber-500' },
+    { value: 'high', label: 'Alta', border: 'border-rose-300 dark:border-rose-800', bg: 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300', dot: 'bg-rose-500' },
   ];
 
   return (
@@ -327,7 +326,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Nível de Urgência
               </label>
-              <div className="grid grid-cols-4 gap-1">
+              <div className="grid grid-cols-3 gap-1.5">
                 {urgencies.map((u) => (
                   <button
                     key={u.value}
