@@ -47,6 +47,14 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   order: number;
+  gmailThreadId?: string;
+  emailMessageId?: string;
+  emailSubject?: string;
+  emailFrom?: string;
+  emailTo?: string;
+  emailCc?: string;
+  resolutionNote?: string;
+  source?: 'web' | 'gmail';
 }
 
 export type ViewMode = 'kanban' | 'list' | 'calendar' | 'reports';

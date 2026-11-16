@@ -21,6 +21,7 @@ import {
   Download,
   FileIcon,
   ImageIcon,
+  Mail,
   X as CloseIcon
 } from 'lucide-react';
 import { Task, TaskStatus, TaskUrgency, Attachment } from '../types';
@@ -254,6 +255,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             </>
           )}
         </button>
+
+        {/* Gmail Origin Badge */}
+        {task.source === 'gmail' && (
+          <span
+            title={task.emailFrom ? `Origem: Gmail (${task.emailFrom})` : 'Origem: E-mail Gmail'}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9.5px] font-semibold rounded border text-rose-700 bg-rose-50 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/80"
+          >
+            <Mail className="w-2.5 h-2.5 shrink-0" />
+            <span>Gmail</span>
+          </span>
+        )}
 
         {/* Compact Tags */}
         {task.tags && task.tags.slice(0, 2).map((tag) => (

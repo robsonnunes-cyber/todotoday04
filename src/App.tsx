@@ -256,8 +256,8 @@ export default function App() {
 
         if (tasksRes.tasks && tasksRes.tasks.length > 0) {
           setTasks(prev => {
-            const prevStr = JSON.stringify(prev.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, updatedAt: t.updatedAt })));
-            const nextStr = JSON.stringify(tasksRes.tasks.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, updatedAt: t.updatedAt })));
+            const prevStr = JSON.stringify(prev.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, updatedAt: t.updatedAt })));
+            const nextStr = JSON.stringify(tasksRes.tasks.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, updatedAt: t.updatedAt })));
             if (prevStr === nextStr) return prev;
             return tasksRes.tasks.map(rem => {
               const local = prev.find(p => p.id === rem.id);
@@ -600,6 +600,14 @@ export default function App() {
       const updated: Task = {
         ...editingTask,
         ...taskData,
+        gmailThreadId: taskData.gmailThreadId ?? editingTask.gmailThreadId,
+        emailMessageId: taskData.emailMessageId ?? editingTask.emailMessageId,
+        emailSubject: taskData.emailSubject ?? editingTask.emailSubject,
+        emailFrom: taskData.emailFrom ?? editingTask.emailFrom,
+        emailTo: taskData.emailTo ?? editingTask.emailTo,
+        emailCc: taskData.emailCc ?? editingTask.emailCc,
+        resolutionNote: taskData.resolutionNote !== undefined ? taskData.resolutionNote : editingTask.resolutionNote,
+        source: taskData.source ?? editingTask.source ?? 'web',
         updatedAt: new Date().toISOString(),
       } as Task;
 
@@ -693,6 +701,8 @@ export default function App() {
         tags: taskData.tags || [],
         attachments: taskData.attachments || [],
         subtasks: taskData.subtasks || [],
+        resolutionNote: taskData.resolutionNote || '',
+        source: taskData.source || 'web',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         order: tasks.length,
@@ -746,7 +756,19 @@ export default function App() {
       }
     }
 
-    const updatedTask: Task = { ...targetTask, status: newStatus, updatedAt: new Date().toISOString() };
+    const updatedTask: Task = {
+      ...targetTask,
+      status: newStatus,
+      gmailThreadId: targetTask.gmailThreadId,
+      emailMessageId: targetTask.emailMessageId,
+      emailSubject: targetTask.emailSubject,
+      emailFrom: targetTask.emailFrom,
+      emailTo: targetTask.emailTo,
+      emailCc: targetTask.emailCc,
+      resolutionNote: targetTask.resolutionNote,
+      source: targetTask.source || 'web',
+      updatedAt: new Date().toISOString(),
+    };
 
     // Recurrence logic: if marking as done and task is recurrent, automatically generate the next occurrence
     let nextRecurrentTask: Task | null = null;
@@ -804,8 +826,19 @@ export default function App() {
       addToast('info', 'Status Atualizado', `Movida para ${newStatus === 'done' ? 'Concluído' : newStatus === 'in_progress' ? 'Em Progresso' : 'A Fazer'}`);
     }
 
-    // Automatically sync to Supabase database
-    SupabaseService.updateTask(taskId, { status: newStatus, recurrence: updatedTask.recurrence }).catch(e => console.warn('Supabase status update failed', e));
+    // Automatically sync to Supabase database preserving Gmail metadata and resolutionNote
+    SupabaseService.updateTask(taskId, {
+      status: newStatus,
+      recurrence: updatedTask.recurrence,
+      gmailThreadId: updatedTask.gmailThreadId,
+      emailMessageId: updatedTask.emailMessageId,
+      emailSubject: updatedTask.emailSubject,
+      emailFrom: updatedTask.emailFrom,
+      emailTo: updatedTask.emailTo,
+      emailCc: updatedTask.emailCc,
+      resolutionNote: updatedTask.resolutionNote,
+      source: updatedTask.source || 'web',
+    }).catch(e => console.warn('Supabase status update failed', e));
   };
 
   const handleDeleteTask = async (taskId: string) => {
@@ -976,6 +1009,8 @@ export default function App() {
               const newTask: Task = {
                 id: `task_${Date.now()}`,
                 title: taskData.title || 'Nova Tarefa',
+                company: taskData.company || '',
+                ticket: taskData.ticket || '',
                 description: taskData.description || '',
                 urgency: taskData.urgency || 'medium',
                 status: taskData.status || 'todo',
@@ -985,6 +1020,7 @@ export default function App() {
                 tags: [],
                 subtasks: [],
                 attachments: [],
+                source: 'web',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 order: tasks.length + 1,

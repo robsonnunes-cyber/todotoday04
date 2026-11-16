@@ -73,6 +73,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [recurrence, setRecurrence] = useState<TaskRecurrence>('single');
+  const [resolutionNote, setResolutionNote] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -89,6 +90,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setTags(initialTask.tags || []);
       setAttachments(initialTask.attachments || []);
       setSubtasks(initialTask.subtasks || []);
+      setResolutionNote(initialTask.resolutionNote || '');
     } else {
       setTitle('');
       setCompany('');
@@ -102,6 +104,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setTags([]);
       setAttachments([]);
       setSubtasks([]);
+      setResolutionNote('');
     }
     setAssigneeSearch('');
   }, [initialTask, defaultStatus, defaultDate, isOpen]);
@@ -195,7 +198,22 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     if (!title.trim()) return;
 
     onSave({
-      ...(initialTask ? { id: initialTask.id, createdAt: initialTask.createdAt, order: initialTask.order } : {}),
+      ...(initialTask
+        ? {
+            id: initialTask.id,
+            createdAt: initialTask.createdAt,
+            order: initialTask.order,
+            gmailThreadId: initialTask.gmailThreadId,
+            emailMessageId: initialTask.emailMessageId,
+            emailSubject: initialTask.emailSubject,
+            emailFrom: initialTask.emailFrom,
+            emailTo: initialTask.emailTo,
+            emailCc: initialTask.emailCc,
+            source: initialTask.source,
+          }
+        : {
+            source: 'web',
+          }),
       title: title.trim(),
       company: company.trim(),
       description: description.trim(),
@@ -208,6 +226,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       tags,
       attachments,
       subtasks,
+      resolutionNote: resolutionNote.trim(),
       updatedAt: new Date().toISOString(),
     });
   };
@@ -425,6 +444,72 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
             />
           </div>
+
+          {/* Gmail Origin & Resolution Block */}
+          {initialTask?.source === 'gmail' && (
+            <div className="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/70 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider">
+                <Mail className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                <span>Origem: E-mail Gmail (Disparo automático para todos ao concluir)</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 text-xs bg-white/80 dark:bg-slate-900/70 p-3 rounded-xl border border-rose-100 dark:border-rose-900/50">
+                <div>
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">Solicitante: </span>
+                  <span className="text-slate-800 dark:text-slate-200 font-medium break-all">
+                    {initialTask.emailFrom || 'Não informado'}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">Envolvidos no histórico (Para / CC): </span>
+                  <div className="mt-1 space-y-0.5 text-slate-700 dark:text-slate-300 break-all">
+                    {initialTask.emailTo && (
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Para: </span>
+                        <span>{initialTask.emailTo}</span>
+                      </div>
+                    )}
+                    {initialTask.emailCc && (
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">CC: </span>
+                        <span>{initialTask.emailCc}</span>
+                      </div>
+                    )}
+                    {!initialTask.emailTo && !initialTask.emailCc && (
+                      <span className="text-slate-400 italic">Sem outros destinatários registrados</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                    Prévia do Assunto Padrão Reclassificado na resposta:
+                  </span>
+                  <div className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono text-[11.5px] break-words border border-slate-200 dark:border-slate-700">
+                    {`Solicitação Controladoria - [CONCLUÍDO] ${ticket ? `[${ticket}] ` : ''}${company ? `[${company}] - ` : ''}${title}`}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="input-task-resolution-note"
+                  className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5"
+                >
+                  Parecer / Resposta de Conclusão (Enviado no e-mail)
+                </label>
+                <textarea
+                  id="input-task-resolution-note"
+                  rows={3}
+                  value={resolutionNote}
+                  onChange={(e) => setResolutionNote(e.target.value)}
+                  placeholder="Digite o parecer final ou resposta que será enviada automaticamente por e-mail ao concluir este chamado..."
+                  className="w-full px-3.5 py-2 text-sm bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/80 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-rose-500 resize-y"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Assignees & Due Date */}
           <div className="space-y-4">

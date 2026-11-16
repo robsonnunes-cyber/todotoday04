@@ -39,11 +39,27 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   subtasks JSONB DEFAULT '[]'::jsonb,
   "order" INTEGER DEFAULT 0,
   "createdAt" TIMESTAMPTZ DEFAULT NOW(),
-  "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+  "updatedAt" TIMESTAMPTZ DEFAULT NOW(),
+  gmail_thread_id TEXT,
+  email_message_id TEXT,
+  email_subject TEXT,
+  email_from TEXT,
+  email_to TEXT,
+  email_cc TEXT,
+  resolution_note TEXT,
+  source TEXT DEFAULT 'web'
 );
 
--- Garantir coluna recurrence
+-- Garantir colunas adicionais (recorrência e integração Gmail)
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS recurrence TEXT DEFAULT 'single';
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS gmail_thread_id TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS email_message_id TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS email_subject TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS email_from TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS email_to TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS email_cc TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS resolution_note TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'web';
 
 -- 2. Tabela de Colaboradores / Membros
 CREATE TABLE IF NOT EXISTS public.team_members (
@@ -197,6 +213,100 @@ export class SupabaseService {
   }
 
   /**
+   * Converte linha do banco Supabase (snake_case) para o objeto Task (camelCase)
+   */
+  private static mapRowToTask(row: Record<string, any>): Task {
+    const {
+      gmail_thread_id,
+      email_message_id,
+      email_subject,
+      email_from,
+      email_to,
+      email_cc,
+      resolution_note,
+      source,
+      ...rest
+    } = row;
+
+    return {
+      ...(rest as Task),
+      gmailThreadId: gmail_thread_id ?? row.gmailThreadId ?? undefined,
+      emailMessageId: email_message_id ?? row.emailMessageId ?? undefined,
+      emailSubject: email_subject ?? row.emailSubject ?? undefined,
+      emailFrom: email_from ?? row.emailFrom ?? undefined,
+      emailTo: email_to ?? row.emailTo ?? undefined,
+      emailCc: email_cc ?? row.emailCc ?? undefined,
+      resolutionNote: resolution_note ?? row.resolutionNote ?? undefined,
+      source: (source as 'web' | 'gmail') || 'web',
+    };
+  }
+
+  /**
+   * Converte objeto Task completo para linha do banco Supabase
+   */
+  private static mapTaskToRow(task: Task, indexFallback?: number): Record<string, any> {
+    const {
+      gmailThreadId,
+      emailMessageId,
+      emailSubject,
+      emailFrom,
+      emailTo,
+      emailCc,
+      resolutionNote,
+      source,
+      ...rest
+    } = task;
+
+    return {
+      ...rest,
+      order: typeof task.order === 'number' ? task.order : (indexFallback ?? 0),
+      recurrence: task.recurrence || 'single',
+      updatedAt: new Date().toISOString(),
+      gmail_thread_id: gmailThreadId ?? null,
+      email_message_id: emailMessageId ?? null,
+      email_subject: emailSubject ?? null,
+      email_from: emailFrom ?? null,
+      email_to: emailTo ?? null,
+      email_cc: emailCc ?? null,
+      resolution_note: resolutionNote ?? null,
+      source: source || 'web',
+    };
+  }
+
+  /**
+   * Converte atualização parcial de Task para colunas do banco Supabase
+   */
+  private static mapUpdatesToRow(updates: Partial<Task>): Record<string, any> {
+    const {
+      gmailThreadId,
+      emailMessageId,
+      emailSubject,
+      emailFrom,
+      emailTo,
+      emailCc,
+      resolutionNote,
+      source,
+      ...rest
+    } = updates;
+
+    const payload: Record<string, any> = {
+      ...rest,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if ('gmailThreadId' in updates) payload.gmail_thread_id = gmailThreadId ?? null;
+    if ('emailMessageId' in updates) payload.email_message_id = emailMessageId ?? null;
+    if ('emailSubject' in updates) payload.email_subject = emailSubject ?? null;
+    if ('emailFrom' in updates) payload.email_from = emailFrom ?? null;
+    if ('emailTo' in updates) payload.email_to = emailTo ?? null;
+    if ('emailCc' in updates) payload.email_cc = emailCc ?? null;
+    if ('resolutionNote' in updates) payload.resolution_note = resolutionNote ?? null;
+    if ('source' in updates) payload.source = source || 'web';
+
+    return payload;
+  }
+
+  /**
    * Busca todas as tarefas diretamente no Supabase
    */
   static async fetchTasks(): Promise<{ tasks: Task[]; error?: string; tableReady?: boolean }> {
@@ -213,7 +323,8 @@ export class SupabaseService {
         return { tasks: [], error: error.message, tableReady: false };
       }
 
-      return { tasks: (data as Task[]) || [], tableReady: true };
+      const mappedTasks = (data || []).map((row) => this.mapRowToTask(row));
+      return { tasks: mappedTasks, tableReady: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { tasks: [], error: msg };
@@ -225,10 +336,7 @@ export class SupabaseService {
    */
   static async saveTask(task: Task): Promise<boolean> {
     try {
-      const payload = {
-        ...task,
-        updatedAt: new Date().toISOString(),
-      };
+      const payload = this.mapTaskToRow(task);
       const { error } = await supabase.from('tasks').upsert(payload);
       if (error) {
         console.warn('Supabase saveTask error:', error.message);
@@ -246,10 +354,7 @@ export class SupabaseService {
    */
   static async updateTask(id: string, updates: Partial<Task>): Promise<boolean> {
     try {
-      const payload = {
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      };
+      const payload = this.mapUpdatesToRow(updates);
       const { error } = await supabase.from('tasks').update(payload).eq('id', id);
       if (error) {
         console.warn('Supabase updateTask error:', error.message);
@@ -288,12 +393,7 @@ export class SupabaseService {
         return { success: true, count: 0 };
       }
 
-      const prepared = tasks.map((t, idx) => ({
-        ...t,
-        order: typeof t.order === 'number' ? t.order : idx,
-        recurrence: t.recurrence || 'single',
-        updatedAt: new Date().toISOString(),
-      }));
+      const prepared = tasks.map((t, idx) => this.mapTaskToRow(t, idx));
 
       const { error } = await supabase.from('tasks').upsert(prepared);
       if (error) {
