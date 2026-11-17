@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   email_to TEXT,
   email_cc TEXT,
   resolution_note TEXT,
-  source TEXT DEFAULT 'web'
+  source TEXT DEFAULT 'web',
+  completed_by TEXT
 );
 
 -- Garantir colunas adicionais (recorrência e integração Gmail)
@@ -60,6 +61,7 @@ ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS email_to TEXT;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS email_cc TEXT;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS resolution_note TEXT;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'web';
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS completed_by TEXT;
 
 -- 2. Tabela de Colaboradores / Membros
 CREATE TABLE IF NOT EXISTS public.team_members (
@@ -251,6 +253,7 @@ export class SupabaseService {
       email_cc,
       resolution_note,
       source,
+      completed_by,
       ...rest
     } = row;
 
@@ -265,6 +268,7 @@ export class SupabaseService {
       emailCc: email_cc ?? row.emailCc ?? undefined,
       resolutionNote: resolution_note ?? row.resolutionNote ?? undefined,
       source: source === 'gmail' || row.source === 'gmail' ? 'gmail' : 'web',
+      completedBy: completed_by ?? row.completedBy ?? undefined,
     };
   }
 
@@ -281,6 +285,7 @@ export class SupabaseService {
       emailCc,
       resolutionNote,
       source,
+      completedBy,
       ...rest
     } = task;
 
@@ -298,6 +303,7 @@ export class SupabaseService {
       email_cc: emailCc ?? null,
       resolution_note: resolutionNote ?? null,
       source: source === 'gmail' ? 'gmail' : 'web',
+      completed_by: completedBy ?? null,
     };
   }
 
@@ -316,6 +322,7 @@ export class SupabaseService {
       emailCc,
       resolutionNote,
       source,
+      completedBy,
       ...rest
     } = updates;
 
@@ -335,6 +342,7 @@ export class SupabaseService {
     if ('emailCc' in updates) payload.email_cc = emailCc ?? null;
     if ('resolutionNote' in updates) payload.resolution_note = resolutionNote ?? null;
     if ('source' in updates) payload.source = source === 'gmail' ? 'gmail' : 'web';
+    if ('completedBy' in updates) payload.completed_by = completedBy ?? null;
 
     return payload;
   }

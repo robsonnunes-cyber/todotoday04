@@ -314,8 +314,8 @@ export default function App() {
                 recurrence: (rem.recurrence && rem.recurrence !== 'single') ? rem.recurrence : (local?.recurrence || rem.recurrence || 'single')
               };
             });
-            const prevStr = JSON.stringify(prev.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, updatedAt: t.updatedAt })));
-            const nextStr = JSON.stringify(merged.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, updatedAt: t.updatedAt })));
+            const prevStr = JSON.stringify(prev.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, completedBy: t.completedBy, updatedAt: t.updatedAt })));
+            const nextStr = JSON.stringify(merged.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, completedBy: t.completedBy, updatedAt: t.updatedAt })));
             return prevStr === nextStr ? prev : merged;
           });
         }
@@ -685,6 +685,18 @@ export default function App() {
     };
   };
 
+  // Resolve quem concluiu a tarefa: nome de exibição (ou e-mail) do usuário logado, com fallback para assignees[0]
+  const resolveCompletedBy = useCallback(
+    (taskAssignees?: Assignee[]): string | undefined => {
+      const userLabel = currentUser?.name?.trim() || currentUser?.email?.trim();
+      if (userLabel) return userLabel;
+      const firstAssignee = taskAssignees?.[0];
+      const assigneeLabel = firstAssignee?.name?.trim() || firstAssignee?.email?.trim();
+      return assigneeLabel || undefined;
+    },
+    [currentUser]
+  );
+
   // Handlers for Task Operations (CRUD)
   const handleCreateOrUpdateTask = async (taskData: Partial<Task>) => {
     const isEdit = Boolean(editingTask);
@@ -692,6 +704,14 @@ export default function App() {
     if (isEdit && editingTask) {
       const normalizedStatus = normalizeTaskStatus(taskData.status ?? editingTask.status);
       const nowIso = new Date().toISOString();
+      const wasNotDone = editingTask.status !== 'done';
+      const isNowDone = normalizedStatus === 'done';
+      const resolvedAssignees = taskData.assignees ?? editingTask.assignees;
+      const completedByValue = isNowDone
+        ? (wasNotDone
+            ? resolveCompletedBy(resolvedAssignees) ?? editingTask.completedBy
+            : editingTask.completedBy ?? resolveCompletedBy(resolvedAssignees))
+        : undefined;
 
       const updated: Task = {
         ...editingTask,
@@ -705,11 +725,9 @@ export default function App() {
         emailCc: taskData.emailCc ?? editingTask.emailCc,
         resolutionNote: taskData.resolutionNote !== undefined ? taskData.resolutionNote : editingTask.resolutionNote,
         source: taskData.source ?? editingTask.source ?? 'web',
+        completedBy: completedByValue,
         updatedAt: nowIso,
       } as Task;
-
-      const wasNotDone = editingTask.status !== 'done';
-      const isNowDone = updated.status === 'done';
 
       if (wasNotDone && isNowDone) {
         try {
@@ -804,13 +822,14 @@ export default function App() {
       }
 
       const nowIso = new Date().toISOString();
+      const newStatus = normalizeTaskStatus(taskData.status || defaultStatus);
       const newTask: Task = {
         id: 'TASK-' + Date.now().toString().slice(-4),
         title: taskData.title || 'Nova Tarefa',
         company: taskData.company || '',
         description: taskData.description || '',
         ticket: taskData.ticket || '',
-        status: normalizeTaskStatus(taskData.status || defaultStatus),
+        status: newStatus,
         urgency: taskData.urgency || 'medium',
         recurrence: taskData.recurrence || 'single',
         assignees: defaultAssignees,
@@ -820,6 +839,7 @@ export default function App() {
         subtasks: taskData.subtasks || [],
         resolutionNote: taskData.resolutionNote || '',
         source: taskData.source || 'web',
+        completedBy: newStatus === 'done' ? resolveCompletedBy(defaultAssignees) : undefined,
         createdAt: nowIso,
         updatedAt: nowIso,
         order: tasks.length,
@@ -896,6 +916,10 @@ export default function App() {
       }
     }
 
+    const completedByValue = isNowDone
+      ? (resolveCompletedBy(targetTask.assignees) ?? targetTask.completedBy)
+      : undefined;
+
     const updatedTask: Task = {
       ...targetTask,
       status: normalizedStatus,
@@ -907,6 +931,7 @@ export default function App() {
       emailCc: targetTask.emailCc,
       resolutionNote: targetTask.resolutionNote,
       source: targetTask.source || 'web',
+      completedBy: completedByValue,
       updatedAt: nowIso,
     };
 
@@ -963,6 +988,7 @@ export default function App() {
         emailCc: updatedTask.emailCc,
         resolutionNote: updatedTask.resolutionNote,
         source: updatedTask.source || 'web',
+        completedBy: updatedTask.completedBy,
       });
 
       if (!result.success) {
@@ -1166,6 +1192,8 @@ export default function App() {
                 defaultAssignees = [userAssignee];
               }
 
+              const quickStatus = normalizeTaskStatus(taskData.status || 'todo');
+              const nowIso = new Date().toISOString();
               const newTask: Task = {
                 id: `task_${Date.now()}`,
                 title: taskData.title || 'Nova Tarefa',
@@ -1173,7 +1201,7 @@ export default function App() {
                 ticket: taskData.ticket || '',
                 description: taskData.description || '',
                 urgency: taskData.urgency || 'medium',
-                status: taskData.status || 'todo',
+                status: quickStatus,
                 recurrence: taskData.recurrence || 'single',
                 assignees: defaultAssignees,
                 dueDate: taskData.dueDate || '',
@@ -1181,8 +1209,9 @@ export default function App() {
                 subtasks: [],
                 attachments: [],
                 source: 'web',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
+                completedBy: quickStatus === 'done' ? resolveCompletedBy(defaultAssignees) : undefined,
+                createdAt: nowIso,
+                updatedAt: nowIso,
                 order: tasks.length + 1,
               };
               setTasks(prev => [newTask, ...prev]);

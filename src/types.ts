@@ -55,6 +55,7 @@ export interface Task {
   emailCc?: string;
   resolutionNote?: string;
   source?: 'web' | 'gmail';
+  completedBy?: string;
 }
 
 export type ViewMode = 'kanban' | 'list' | 'calendar' | 'reports';
