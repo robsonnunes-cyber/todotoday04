@@ -233,10 +233,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-1.5">
         
         {/* BARRA 1: PRAZOS / DATAS (com Busca, Chamado e Ações) */}
-        <div className="flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 w-full py-0.5">
           
           {/* Quick Search & Ticket Inputs */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Global Search Input */}
             <div className="relative w-36 sm:w-44 lg:w-48">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
@@ -246,7 +246,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 value={filters.search}
                 onChange={handleSearchChange}
                 placeholder="Buscar tarefas..."
-                className="w-full pl-8 pr-6 py-1 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition-all"
+                className="w-full pl-8 pr-6 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition-all"
               />
               {filters.search && (
                 <button
@@ -267,7 +267,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 value={filters.ticketSearch}
                 onChange={handleTicketSearchChange}
                 placeholder="Chamado..."
-                className="w-full pl-6 pr-5 py-1 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono transition-all"
+                className="w-full pl-6 pr-5 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono transition-all"
               />
               {filters.ticketSearch && (
                 <button
@@ -283,7 +283,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 shrink-0 hidden md:block mx-0.5" />
 
           {/* DEDICATED PRAZOS BAR */}
-          <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-0.5 rounded-lg shrink-0 border border-slate-200/60 dark:border-slate-700/60 overflow-x-auto scrollbar-none">
+          <div className="flex flex-wrap items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60 max-w-full">
             <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 px-1.5 flex items-center gap-1 select-none">
               <Calendar className="w-3 h-3 text-blue-500" />
               Prazos:
@@ -294,7 +294,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               const isOverdue = opt.value === 'overdue';
               const isToday = opt.value === 'today';
 
-              let btnClasses = 'px-1.5 py-0.5 text-xs font-medium rounded-md whitespace-nowrap transition-all flex items-center gap-1 ';
+              let btnClasses = 'px-2.5 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ';
               if (isActive) {
                 if (isOverdue) {
                   btnClasses += 'bg-rose-600 text-white shadow-2xs font-semibold ring-1 ring-rose-500/30';
@@ -339,11 +339,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </div>
 
           {/* Action buttons: Filtros avançados & Limpar */}
-          <div className="flex items-center gap-1 shrink-0 pl-1">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               id="btn-toggle-advanced-filters"
               onClick={() => setIsExpanded(!isExpanded)}
-              className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg border transition-all shrink-0 ${
+              className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all shrink-0 ${
                 isExpanded || hasActiveFilters
                   ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
                   : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
@@ -364,7 +364,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 id="btn-reset-filters"
                 onClick={resetFilters}
                 title="Limpar todos os filtros"
-                className="flex items-center gap-1 px-1.5 py-1 text-xs font-medium text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition-colors shrink-0"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition-colors shrink-0"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span className="hidden sm:inline">Limpar</span>
@@ -374,12 +374,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
         </div>
 
-        {/* BARRA 2: STATUS & PRIORIDADES (Dedicada com chips ativos à direita) */}
-        <div className="mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2 overflow-x-auto scrollbar-none py-0.5">
+        {/* BARRA 2: STATUS & PRIORIDADES (Dedicada com chips ativos) */}
+        <div className="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2 w-full py-0.5">
           
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Section: Status */}
-            <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-0.5 rounded-lg shrink-0 border border-slate-200/60 dark:border-slate-700/60">
+            <div className="flex flex-wrap items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60 max-w-full">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 px-1.5 flex items-center gap-1 select-none">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                 Status:
@@ -394,7 +394,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     key={st.value}
                     id={`quick-status-${st.value}`}
                     onClick={() => toggleStatus(st.value)}
-                    className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md whitespace-nowrap transition-all ${
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${
                       isSelected
                         ? st.value === 'todo'
                           ? 'bg-blue-600 text-white font-semibold shadow-2xs ring-1 ring-blue-500/20'
@@ -420,10 +420,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             </div>
 
             {/* Divider */}
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0" />
+            <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0 hidden sm:block" />
 
             {/* Section: Prioridade (Baixa, Média e Alta) */}
-            <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/90 p-0.5 rounded-lg shrink-0 border border-slate-200/60 dark:border-slate-700/60">
+            <div className="flex flex-wrap items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60 max-w-full">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 px-1.5 flex items-center gap-1 select-none">
                 <AlertCircle className="w-3 h-3 text-rose-500" />
                 Prioridade:
@@ -437,7 +437,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     key={opt.value}
                     id={`quick-urgency-${opt.value}`}
                     onClick={() => toggleUrgency(opt.value)}
-                    className={`flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-md whitespace-nowrap transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-all ${
                       isSelected
                         ? opt.activeClass
                         : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-700/80'
@@ -461,7 +461,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
           {/* DYNAMIC ACTIVE FILTER PILLS (Alinhados na Barra 2) */}
           {hasActiveFilters && (
-            <div className="flex items-center gap-1 text-[11px] overflow-x-auto scrollbar-none py-0.5 shrink-0 pl-2">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] py-0.5">
               <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 shrink-0">
                 Ativos:
               </span>

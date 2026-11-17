@@ -151,9 +151,9 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 pb-8 flex-1 flex flex-col">
       {/* Side-by-side columns layout with smooth horizontal scroll for buckets */}
-      <div className="flex flex-row overflow-x-auto gap-3 sm:gap-4 items-stretch pb-1 h-full min-h-0 flex-1">
+      <div className="flex flex-row overflow-x-auto gap-3 sm:gap-4 items-stretch pb-8 flex-1">
         {columns.map((column) => {
           // Classificar os cards (especialmente 'A Fazer') pela data de vencimento depois prioridade
           const columnTasks = tasks
@@ -185,7 +185,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 isDraggingOver
                   ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 dark:bg-blue-950/20 shadow-md'
                   : 'border-slate-200/80 dark:border-slate-800/90 shadow-2xs'
-              } p-2.5 sm:p-3 h-full max-h-full min-h-0`}
+              } p-2.5 sm:p-3`}
             >
               {/* Microsoft Planner Bucket Header */}
               <div className="flex items-center justify-between gap-2 px-1 py-1 mb-2.5">
@@ -284,8 +284,8 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
                 </button>
               )}
 
-              {/* Tasks Cards List - Scrollable internally within column */}
-              <div className="space-y-2 flex-1 overflow-y-auto pr-1 scrollbar-thin min-h-0">
+              {/* Tasks Cards List */}
+              <div className="space-y-2 flex-1 pr-1">
                 {columnTasks.length > 0 ? (
                   columnTasks.map((task) => (
                     <TaskCard

@@ -946,7 +946,7 @@ export default function App() {
 
   // 3. Authenticated: Full access to tasks, kanban, metrics and team activities
   return (
-    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 overflow-y-auto">
       
       {/* Header Navigation */}
       <Navbar
@@ -980,8 +980,8 @@ export default function App() {
         />
       )}
 
-      {/* Main Viewport Container (Fits strictly in single screen) */}
-      <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
+      {/* Main Viewport Container */}
+      <main className="flex-1 flex flex-col">
         {viewMode === 'kanban' && (
           <KanbanView
             tasks={filteredTasks}
@@ -1035,7 +1035,7 @@ export default function App() {
         )}
 
         {viewMode === 'list' && (
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1">
             <ListView
               tasks={filteredTasks}
               onEditTask={handleOpenEditTask}
@@ -1049,7 +1049,7 @@ export default function App() {
         )}
 
         {viewMode === 'calendar' && (
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1">
             <CalendarView
               tasks={filteredTasks}
               onEditTask={handleOpenEditTask}
@@ -1060,7 +1060,7 @@ export default function App() {
         )}
 
         {viewMode === 'reports' && (
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1">
             <ReportsView
               tasks={tasks}
               assignees={assignees}
