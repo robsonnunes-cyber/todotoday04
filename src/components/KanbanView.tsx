@@ -157,7 +157,11 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         {columns.map((column) => {
           // Classificar os cards (especialmente 'A Fazer') pela data de vencimento depois prioridade
           const columnTasks = tasks
-            .filter((t) => t.status === column.id)
+            .filter((t) => {
+              if (column.id === 'todo') return t.status === 'todo';
+              if (column.id === 'in_progress') return t.status === 'in_progress';
+              return t.status === 'done';
+            })
             .sort((a, b) => {
               // 1. Data de vencimento: mais próximas e vencidas primeiro; com data antes de sem data
               if (a.dueDate && !b.dueDate) return -1;

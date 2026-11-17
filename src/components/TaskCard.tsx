@@ -118,12 +118,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   };
 
   const handleToggleComplete = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
-    if (task.status === 'done') {
-      onStatusChange(task.id, 'todo');
-    } else {
-      onStatusChange(task.id, 'done');
-    }
+    const nextStatus: TaskStatus = task.status === 'done' ? 'todo' : 'done';
+    onStatusChange(task.id, nextStatus);
   };
 
   // Direct file processing from file input or drag-and-drop

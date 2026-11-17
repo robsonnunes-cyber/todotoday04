@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   Task, 
@@ -77,19 +77,58 @@ export default function App() {
     }
   }, []);
 
+  const normalizeTaskStatus = useCallback((rawStatus: unknown): TaskStatus => {
+    const normalized = String(rawStatus ?? 'todo').trim().toLowerCase();
+    if (
+      normalized === 'done' ||
+      normalized === 'completed' ||
+      normalized === 'concluido' ||
+      normalized === 'concluído' ||
+      normalized === 'finalizado'
+    ) {
+      return 'done';
+    }
+    if (
+      normalized === 'in_progress' ||
+      normalized === 'in-progress' ||
+      normalized === 'em_andamento' ||
+      normalized === 'em andamento' ||
+      normalized === 'progresso'
+    ) {
+      return 'in_progress';
+    }
+    return 'todo';
+  }, []);
+
   // Main tasks state
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_TASKS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((t: Task) => ({
+            ...t,
+            status:
+              String(t.status ?? 'todo').trim().toLowerCase() === 'done'
+                ? 'done'
+                : String(t.status ?? 'todo').trim().toLowerCase() === 'in_progress'
+                  ? 'in_progress'
+                  : 'todo',
+          }));
+        }
       }
     } catch (e) {
       console.warn('Failed to load backup tasks', e);
     }
     return INITIAL_TASKS;
   });
+
+  const tasksRef = useRef<Task[]>(tasks);
+  tasksRef.current = tasks;
+
+  // Tracks task IDs with in-flight or very recent optimistic updates so background polling doesn't overwrite them with stale data
+  const pendingTaskSyncRef = useRef<Map<string, number>>(new Map());
 
   // Dynamic team members state with LocalStorage persistence and Sheets sync
   const [assignees, setAssignees] = useState<Assignee[]>(() => {
@@ -203,11 +242,17 @@ export default function App() {
 
         // If tasks exist in Supabase, load them; otherwise auto-seed
         if (tasksRes.tasks && tasksRes.tasks.length > 0) {
+          const now = Date.now();
           setTasks(prev => {
             return tasksRes.tasks.map(rem => {
               const local = prev.find(p => p.id === rem.id);
+              const pendingUntil = pendingTaskSyncRef.current.get(rem.id);
+              if (local && pendingUntil && pendingUntil > now) {
+                return local;
+              }
               return {
                 ...rem,
+                status: normalizeTaskStatus(rem.status),
                 recurrence: (rem.recurrence && rem.recurrence !== 'single') ? rem.recurrence : (local?.recurrence || rem.recurrence || 'single')
               };
             });
@@ -255,17 +300,23 @@ export default function App() {
         if (!isMounted) return;
 
         if (tasksRes.tasks && tasksRes.tasks.length > 0) {
+          const now = Date.now();
           setTasks(prev => {
-            const prevStr = JSON.stringify(prev.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, updatedAt: t.updatedAt })));
-            const nextStr = JSON.stringify(tasksRes.tasks.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, updatedAt: t.updatedAt })));
-            if (prevStr === nextStr) return prev;
-            return tasksRes.tasks.map(rem => {
+            const merged = tasksRes.tasks.map(rem => {
               const local = prev.find(p => p.id === rem.id);
+              const pendingUntil = pendingTaskSyncRef.current.get(rem.id);
+              if (local && pendingUntil && pendingUntil > now) {
+                return local;
+              }
               return {
                 ...rem,
+                status: normalizeTaskStatus(rem.status),
                 recurrence: (rem.recurrence && rem.recurrence !== 'single') ? rem.recurrence : (local?.recurrence || rem.recurrence || 'single')
               };
             });
+            const prevStr = JSON.stringify(prev.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, updatedAt: t.updatedAt })));
+            const nextStr = JSON.stringify(merged.map(t => ({ id: t.id, status: t.status, recurrence: t.recurrence, source: t.source, resolutionNote: t.resolutionNote, updatedAt: t.updatedAt })));
+            return prevStr === nextStr ? prev : merged;
           });
         }
 
@@ -286,11 +337,17 @@ export default function App() {
       if (document.visibilityState === 'visible') {
         SupabaseService.fetchTasks().then(res => {
           if (isMounted && res.tasks && res.tasks.length > 0) {
+            const now = Date.now();
             setTasks(prev => {
               return res.tasks.map(rem => {
                 const local = prev.find(p => p.id === rem.id);
+                const pendingUntil = pendingTaskSyncRef.current.get(rem.id);
+                if (local && pendingUntil && pendingUntil > now) {
+                  return local;
+                }
                 return {
                   ...rem,
+                  status: normalizeTaskStatus(rem.status),
                   recurrence: (rem.recurrence && rem.recurrence !== 'single') ? rem.recurrence : (local?.recurrence || rem.recurrence || 'single')
                 };
               });
@@ -592,14 +649,54 @@ export default function App() {
     return tasks.filter(t => t.status !== 'done' && (t.dueDate === todayStr || (t.dueDate && t.dueDate < todayStr) || t.urgency === 'high' || t.urgency === 'urgent')).length;
   }, [tasks]);
 
+  // Helper compartilhado para gerar próxima ocorrência de tarefa recorrente ao concluir
+  const createNextRecurrentOccurrence = (completedTask: Task): Task | null => {
+    if (!completedTask.recurrence || completedTask.recurrence === 'single') {
+      return null;
+    }
+
+    const nextDueDate = calculateNextDueDate(completedTask.dueDate, completedTask.recurrence);
+    const resetSubtasks =
+      completedTask.subtasks?.map(s => ({
+        ...s,
+        id: 'sub-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        completed: false,
+      })) || [];
+    const nowIso = new Date().toISOString();
+
+    return {
+      id: 'TASK-' + (Date.now() + 1).toString().slice(-4),
+      title: completedTask.title,
+      company: completedTask.company || '',
+      description: completedTask.description || '',
+      ticket: completedTask.ticket || '',
+      status: 'todo',
+      urgency: completedTask.urgency || 'medium',
+      recurrence: completedTask.recurrence,
+      assignees: completedTask.assignees || [],
+      dueDate: nextDueDate,
+      tags: completedTask.tags || [],
+      attachments: completedTask.attachments || [],
+      subtasks: resetSubtasks,
+      source: 'web',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      order: 0,
+    };
+  };
+
   // Handlers for Task Operations (CRUD)
   const handleCreateOrUpdateTask = async (taskData: Partial<Task>) => {
     const isEdit = Boolean(editingTask);
 
     if (isEdit && editingTask) {
+      const normalizedStatus = normalizeTaskStatus(taskData.status ?? editingTask.status);
+      const nowIso = new Date().toISOString();
+
       const updated: Task = {
         ...editingTask,
         ...taskData,
+        status: normalizedStatus,
         gmailThreadId: taskData.gmailThreadId ?? editingTask.gmailThreadId,
         emailMessageId: taskData.emailMessageId ?? editingTask.emailMessageId,
         emailSubject: taskData.emailSubject ?? editingTask.emailSubject,
@@ -608,42 +705,30 @@ export default function App() {
         emailCc: taskData.emailCc ?? editingTask.emailCc,
         resolutionNote: taskData.resolutionNote !== undefined ? taskData.resolutionNote : editingTask.resolutionNote,
         source: taskData.source ?? editingTask.source ?? 'web',
-        updatedAt: new Date().toISOString(),
+        updatedAt: nowIso,
       } as Task;
 
       const wasNotDone = editingTask.status !== 'done';
       const isNowDone = updated.status === 'done';
-      const isRecurrent = Boolean(updated.recurrence && updated.recurrence !== 'single');
 
-      let nextRecurrentTask: Task | null = null;
-      if (wasNotDone && isNowDone && isRecurrent) {
-        const nextDueDate = calculateNextDueDate(updated.dueDate, updated.recurrence);
-        const resetSubtasks = updated.subtasks?.map(s => ({
-          ...s,
-          id: 'sub-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-          completed: false
-        })) || [];
-
-        nextRecurrentTask = {
-          id: 'TASK-' + (Date.now() + 1).toString().slice(-4),
-          title: updated.title,
-          company: updated.company || '',
-          description: updated.description || '',
-          ticket: updated.ticket || '',
-          status: 'todo',
-          urgency: updated.urgency || 'medium',
-          recurrence: updated.recurrence,
-          assignees: updated.assignees || [],
-          dueDate: nextDueDate,
-          tags: updated.tags || [],
-          attachments: updated.attachments || [],
-          subtasks: resetSubtasks,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          order: 0,
-        };
+      if (wasNotDone && isNowDone) {
+        try {
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.75 },
+            colors: ['#10B981', '#3B82F6', '#6366F1', '#F59E0B']
+          });
+        } catch {
+          // Safe fallback
+        }
       }
 
+      const nextRecurrentTask =
+        wasNotDone && isNowDone ? createNextRecurrentOccurrence(updated) : null;
+
+      // Protege contra sobrescrita por polling em andamento e aplica atualização otimista imediata
+      pendingTaskSyncRef.current.set(updated.id, Date.now() + 8000);
       setTasks(prev => {
         const updatedList = prev.map(t => (t.id === updated.id ? updated : t));
         return nextRecurrentTask ? [nextRecurrentTask, ...updatedList] : updatedList;
@@ -664,13 +749,44 @@ export default function App() {
           'Recorrência Gerada!',
           `Nova ocorrência ${label} criada para ${formatToBRDate(nextRecurrentTask.dueDate)} com checklist reiniciado.`
         );
-        SupabaseService.saveTask(nextRecurrentTask).catch(e => console.warn('Supabase save recurrent task failed', e));
+        try {
+          const savedRecurrent = await SupabaseService.saveTask(nextRecurrentTask);
+          if (!savedRecurrent) {
+            console.error('[App] Falha ao salvar nova ocorrência recorrente no Supabase:', nextRecurrentTask.id);
+          }
+        } catch (err) {
+          console.error('[App] Erro ao salvar ocorrência recorrente no Supabase:', err);
+        }
+      } else if (wasNotDone && isNowDone) {
+        addToast('success', 'Tarefa Concluída', `"${updated.title}" foi movida para Concluído.`);
       } else {
         addToast('success', 'Tarefa Atualizada', `"${updated.title}" foi atualizada.`);
       }
 
-      // Automatically sync to Supabase database
-      SupabaseService.updateTask(updated.id, updated).catch(e => console.warn('Supabase update failed', e));
+      // Sincroniza atualização no Supabase com tratamento e log de erros
+      try {
+        const result = await SupabaseService.updateTask(updated.id, updated);
+        if (!result.success) {
+          console.error('[App] Falha ao sincronizar atualização da tarefa no Supabase:', {
+            taskId: updated.id,
+            status: updated.status,
+            source: updated.source,
+            error: result.error,
+          });
+          addToast(
+            'error',
+            'Erro ao salvar no Supabase',
+            result.error || 'Não foi possível persistir a atualização no banco de dados.'
+          );
+        }
+      } catch (err) {
+        console.error('[App] Exceção ao atualizar tarefa no Supabase:', err);
+        addToast(
+          'error',
+          'Erro ao salvar no Supabase',
+          'Falha de comunicação ao atualizar a tarefa no banco de dados.'
+        );
+      }
     } else {
       // If no assignees selected, automatically assign current authenticated user
       let defaultAssignees = taskData.assignees || [];
@@ -687,13 +803,14 @@ export default function App() {
         defaultAssignees = [userAssignee];
       }
 
+      const nowIso = new Date().toISOString();
       const newTask: Task = {
         id: 'TASK-' + Date.now().toString().slice(-4),
         title: taskData.title || 'Nova Tarefa',
         company: taskData.company || '',
         description: taskData.description || '',
         ticket: taskData.ticket || '',
-        status: taskData.status || defaultStatus,
+        status: normalizeTaskStatus(taskData.status || defaultStatus),
         urgency: taskData.urgency || 'medium',
         recurrence: taskData.recurrence || 'single',
         assignees: defaultAssignees,
@@ -703,17 +820,26 @@ export default function App() {
         subtasks: taskData.subtasks || [],
         resolutionNote: taskData.resolutionNote || '',
         source: taskData.source || 'web',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: nowIso,
+        updatedAt: nowIso,
         order: tasks.length,
       };
 
+      pendingTaskSyncRef.current.set(newTask.id, Date.now() + 8000);
       setTasks(prev => [newTask, ...prev]);
       setIsTaskModalOpen(false);
       addToast('success', 'Tarefa Criada', `"${newTask.title}" adicionada com sucesso.`);
 
       // Automatically sync to Supabase database
-      SupabaseService.saveTask(newTask).catch(e => console.warn('Supabase saveTask failed', e));
+      try {
+        const saved = await SupabaseService.saveTask(newTask);
+        if (!saved) {
+          console.error('[App] Falha ao criar tarefa no Supabase:', newTask.id);
+          addToast('error', 'Erro ao salvar no Supabase', 'A tarefa foi criada localmente, mas falhou ao sincronizar.');
+        }
+      } catch (err) {
+        console.error('[App] Exceção ao criar tarefa no Supabase:', err);
+      }
     }
   };
 
@@ -723,8 +849,16 @@ export default function App() {
       if (t.id === taskId) {
         const isRec = Boolean(t.recurrence && t.recurrence !== 'single');
         const nextRec: TaskRecurrence = isRec ? 'single' : 'monthly';
-        const updated = { ...t, recurrence: nextRec, updatedAt: new Date().toISOString() };
-        SupabaseService.updateTask(taskId, { recurrence: nextRec }).catch(console.warn);
+        const nowIso = new Date().toISOString();
+        const updated = { ...t, recurrence: nextRec, updatedAt: nowIso };
+        pendingTaskSyncRef.current.set(taskId, Date.now() + 8000);
+        SupabaseService.updateTask(taskId, { recurrence: nextRec, updatedAt: nowIso })
+          .then(res => {
+            if (!res.success) {
+              console.error('[App] Erro ao atualizar recorrência no Supabase:', res.error);
+            }
+          })
+          .catch(err => console.error('[App] Exceção ao atualizar recorrência no Supabase:', err));
         addToast(
           'info',
           'Recorrência Alterada',
@@ -738,11 +872,17 @@ export default function App() {
     }));
   };
 
+  // Fluxo único e padronizado de alteração de status / conclusão para tarefas manuais e importadas do Gmail
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
-    const targetTask = tasks.find(t => t.id === taskId);
+    const targetTask = tasksRef.current.find(t => t.id === taskId);
     if (!targetTask) return;
 
-    if (newStatus === 'done' && targetTask.status !== 'done') {
+    const normalizedStatus = normalizeTaskStatus(newStatus);
+    const wasNotDone = targetTask.status !== 'done';
+    const isNowDone = normalizedStatus === 'done';
+    const nowIso = new Date().toISOString();
+
+    if (isNowDone && wasNotDone) {
       // Confetti celebration when task is marked done!
       try {
         confetti({
@@ -751,14 +891,14 @@ export default function App() {
           origin: { y: 0.75 },
           colors: ['#10B981', '#3B82F6', '#6366F1', '#F59E0B']
         });
-      } catch (e) {
+      } catch {
         // Safe fallback
       }
     }
 
     const updatedTask: Task = {
       ...targetTask,
-      status: newStatus,
+      status: normalizedStatus,
       gmailThreadId: targetTask.gmailThreadId,
       emailMessageId: targetTask.emailMessageId,
       emailSubject: targetTask.emailSubject,
@@ -767,45 +907,17 @@ export default function App() {
       emailCc: targetTask.emailCc,
       resolutionNote: targetTask.resolutionNote,
       source: targetTask.source || 'web',
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso,
     };
 
-    // Recurrence logic: if marking as done and task is recurrent, automatically generate the next occurrence
-    let nextRecurrentTask: Task | null = null;
-    if (newStatus === 'done' && targetTask.status !== 'done' && targetTask.recurrence && targetTask.recurrence !== 'single') {
-      const nextDueDate = calculateNextDueDate(targetTask.dueDate, targetTask.recurrence);
-      const resetSubtasks = targetTask.subtasks?.map(s => ({
-        ...s,
-        id: 'sub-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-        completed: false
-      })) || [];
+    const nextRecurrentTask =
+      isNowDone && wasNotDone ? createNextRecurrentOccurrence(updatedTask) : null;
 
-      nextRecurrentTask = {
-        id: 'TASK-' + (Date.now() + 1).toString().slice(-4),
-        title: targetTask.title,
-        company: targetTask.company || '',
-        description: targetTask.description || '',
-        ticket: targetTask.ticket || '',
-        status: 'todo',
-        urgency: targetTask.urgency || 'medium',
-        recurrence: targetTask.recurrence,
-        assignees: targetTask.assignees || [],
-        dueDate: nextDueDate,
-        tags: targetTask.tags || [],
-        attachments: targetTask.attachments || [],
-        subtasks: resetSubtasks,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        order: 0,
-      };
-    }
-
+    // Atualização otimista imediata no estado local (remove de "A Fazer" e move para "Concluído")
+    pendingTaskSyncRef.current.set(taskId, Date.now() + 8000);
     setTasks(prev => {
       const updatedList = prev.map(t => (t.id === taskId ? updatedTask : t));
-      if (nextRecurrentTask) {
-        return [nextRecurrentTask, ...updatedList];
-      }
-      return updatedList;
+      return nextRecurrentTask ? [nextRecurrentTask, ...updatedList] : updatedList;
     });
 
     if (nextRecurrentTask) {
@@ -821,24 +933,64 @@ export default function App() {
         'Recorrência Gerada!',
         `Nova ocorrência ${label} criada para ${formatToBRDate(nextRecurrentTask.dueDate)} com checklist reiniciado.`
       );
-      SupabaseService.saveTask(nextRecurrentTask).catch(e => console.warn('Supabase save recurrent task failed', e));
+      try {
+        const savedRecurrent = await SupabaseService.saveTask(nextRecurrentTask);
+        if (!savedRecurrent) {
+          console.error('[App] Falha ao salvar nova ocorrência recorrente no Supabase:', nextRecurrentTask.id);
+        }
+      } catch (err) {
+        console.error('[App] Exceção ao salvar ocorrência recorrente no Supabase:', err);
+      }
     } else {
-      addToast('info', 'Status Atualizado', `Movida para ${newStatus === 'done' ? 'Concluído' : newStatus === 'in_progress' ? 'Em Progresso' : 'A Fazer'}`);
+      addToast(
+        isNowDone ? 'success' : 'info',
+        isNowDone ? 'Tarefa Concluída' : 'Status Atualizado',
+        `Movida para ${normalizedStatus === 'done' ? 'Concluído' : normalizedStatus === 'in_progress' ? 'Em Progresso' : 'A Fazer'}`
+      );
     }
 
-    // Automatically sync to Supabase database preserving Gmail metadata and resolutionNote
-    SupabaseService.updateTask(taskId, {
-      status: newStatus,
-      recurrence: updatedTask.recurrence,
-      gmailThreadId: updatedTask.gmailThreadId,
-      emailMessageId: updatedTask.emailMessageId,
-      emailSubject: updatedTask.emailSubject,
-      emailFrom: updatedTask.emailFrom,
-      emailTo: updatedTask.emailTo,
-      emailCc: updatedTask.emailCc,
-      resolutionNote: updatedTask.resolutionNote,
-      source: updatedTask.source || 'web',
-    }).catch(e => console.warn('Supabase status update failed', e));
+    // Executa updateTask no Supabase preservando metadados do Gmail e resolutionNote, tratando e logando erros
+    try {
+      const result = await SupabaseService.updateTask(taskId, {
+        status: normalizedStatus,
+        updatedAt: nowIso,
+        recurrence: updatedTask.recurrence,
+        gmailThreadId: updatedTask.gmailThreadId,
+        emailMessageId: updatedTask.emailMessageId,
+        emailSubject: updatedTask.emailSubject,
+        emailFrom: updatedTask.emailFrom,
+        emailTo: updatedTask.emailTo,
+        emailCc: updatedTask.emailCc,
+        resolutionNote: updatedTask.resolutionNote,
+        source: updatedTask.source || 'web',
+      });
+
+      if (!result.success) {
+        console.error('[App] Falha ao atualizar status da tarefa no Supabase:', {
+          taskId,
+          status: normalizedStatus,
+          source: updatedTask.source,
+          error: result.error,
+        });
+        addToast(
+          'error',
+          'Erro ao salvar no Supabase',
+          result.error || 'A tarefa foi movida localmente, mas houve falha ao salvar no banco de dados.'
+        );
+      }
+    } catch (err) {
+      console.error('[App] Exceção ao atualizar status da tarefa no Supabase:', {
+        taskId,
+        status: normalizedStatus,
+        source: updatedTask.source,
+        error: err,
+      });
+      addToast(
+        'error',
+        'Erro ao salvar no Supabase',
+        'Falha de comunicação ao atualizar o status da tarefa no Supabase.'
+      );
+    }
   };
 
   const handleDeleteTask = async (taskId: string) => {
@@ -850,17 +1002,25 @@ export default function App() {
     addToast('warning', 'Tarefa Removida', taskToDelete ? `"${taskToDelete.title}" foi excluída.` : 'Tarefa excluída.');
 
     // Automatically sync to Supabase database
-    SupabaseService.deleteTask(taskId).catch(e => console.warn('Supabase deleteTask failed', e));
+    SupabaseService.deleteTask(taskId).catch(e => console.error('[App] Supabase deleteTask failed:', e));
   };
 
   const handleToggleSubtask = (taskId: string, subtaskId: string) => {
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {
         const updatedSubs = t.subtasks?.map(s => s.id === subtaskId ? { ...s, completed: !s.completed } : s) || [];
-        const updated = { ...t, subtasks: updatedSubs, updatedAt: new Date().toISOString() };
+        const nowIso = new Date().toISOString();
+        const updated = { ...t, subtasks: updatedSubs, updatedAt: nowIso };
+        pendingTaskSyncRef.current.set(taskId, Date.now() + 8000);
         
         // Automatically sync to Supabase database
-        SupabaseService.updateTask(taskId, { subtasks: updatedSubs }).catch(console.warn);
+        SupabaseService.updateTask(taskId, { subtasks: updatedSubs, updatedAt: nowIso })
+          .then(res => {
+            if (!res.success) {
+              console.error('[App] Erro ao atualizar subtarefa no Supabase:', res.error);
+            }
+          })
+          .catch(err => console.error('[App] Exceção ao atualizar subtarefa no Supabase:', err));
         return updated;
       }
       return t;

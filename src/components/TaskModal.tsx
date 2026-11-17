@@ -78,11 +78,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   useEffect(() => {
     if (initialTask) {
+      const normalizedStatus: TaskStatus =
+        initialTask.status === 'done'
+          ? 'done'
+          : initialTask.status === 'in_progress'
+            ? 'in_progress'
+            : 'todo';
       setTitle(initialTask.title || '');
       setCompany(initialTask.company || '');
       setDescription(initialTask.description || '');
       setTicket(initialTask.ticket || '');
-      setStatus(initialTask.status || 'todo');
+      setStatus(normalizedStatus);
       setUrgency(initialTask.urgency === 'urgent' ? 'high' : (initialTask.urgency || 'medium'));
       setRecurrence(initialTask.recurrence || 'single');
       setSelectedAssignees(initialTask.assignees || []);
@@ -193,11 +199,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setSubtasks(subtasks.filter(s => s.id !== subId));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-
-    onSave({
+  const buildTaskPayload = (overrideStatus?: TaskStatus): Partial<Task> => {
+    const finalStatus: TaskStatus = overrideStatus ?? status;
+    return {
       ...(initialTask
         ? {
             id: initialTask.id,
@@ -209,7 +213,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             emailFrom: initialTask.emailFrom,
             emailTo: initialTask.emailTo,
             emailCc: initialTask.emailCc,
-            source: initialTask.source,
+            source: initialTask.source || 'web',
           }
         : {
             source: 'web',
@@ -218,7 +222,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       company: company.trim(),
       description: description.trim(),
       ticket: ticket.trim(),
-      status,
+      status: finalStatus,
       urgency,
       recurrence,
       assignees: selectedAssignees,
@@ -228,7 +232,19 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       subtasks,
       resolutionNote: resolutionNote.trim(),
       updatedAt: new Date().toISOString(),
-    });
+    };
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave(buildTaskPayload());
+  };
+
+  const handleCompleteFromModal = () => {
+    if (!title.trim()) return;
+    setStatus('done');
+    onSave(buildTaskPayload('done'));
   };
 
   const urgencies: { value: TaskUrgency; label: string; border: string; bg: string; dot: string }[] = [
@@ -997,6 +1013,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               >
                 Cancelar
               </button>
+
+              {initialTask && status !== 'done' && (
+                <button
+                  id="btn-complete-task-modal"
+                  type="button"
+                  onClick={handleCompleteFromModal}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs shadow-emerald-600/30 transition-all hover:scale-[1.02]"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Concluir Tarefa</span>
+                </button>
+              )}
 
               <button
                 id="btn-save-task"

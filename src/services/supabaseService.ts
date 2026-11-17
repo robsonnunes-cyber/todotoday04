@@ -1,4 +1,4 @@
-import { Task, Assignee, AuthUser, Attachment } from '../types';
+import { Task, TaskStatus, Assignee, AuthUser, Attachment } from '../types';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY, STORAGE_BUCKET_NAME } from '../lib/supabaseClient';
 
 const STORAGE_AUTH_USER = 'today_todo_auth_user';
@@ -213,6 +213,32 @@ export class SupabaseService {
   }
 
   /**
+   * Padroniza o status da tarefa para 'todo' | 'in_progress' | 'done'
+   */
+  private static normalizeStatus(rawStatus: unknown): TaskStatus {
+    const normalized = String(rawStatus ?? 'todo').trim().toLowerCase();
+    if (
+      normalized === 'done' ||
+      normalized === 'completed' ||
+      normalized === 'concluido' ||
+      normalized === 'concluído' ||
+      normalized === 'finalizado'
+    ) {
+      return 'done';
+    }
+    if (
+      normalized === 'in_progress' ||
+      normalized === 'in-progress' ||
+      normalized === 'em_andamento' ||
+      normalized === 'em andamento' ||
+      normalized === 'progresso'
+    ) {
+      return 'in_progress';
+    }
+    return 'todo';
+  }
+
+  /**
    * Converte linha do banco Supabase (snake_case) para o objeto Task (camelCase)
    */
   private static mapRowToTask(row: Record<string, any>): Task {
@@ -230,6 +256,7 @@ export class SupabaseService {
 
     return {
       ...(rest as Task),
+      status: this.normalizeStatus(row.status),
       gmailThreadId: gmail_thread_id ?? row.gmailThreadId ?? undefined,
       emailMessageId: email_message_id ?? row.emailMessageId ?? undefined,
       emailSubject: email_subject ?? row.emailSubject ?? undefined,
@@ -237,7 +264,7 @@ export class SupabaseService {
       emailTo: email_to ?? row.emailTo ?? undefined,
       emailCc: email_cc ?? row.emailCc ?? undefined,
       resolutionNote: resolution_note ?? row.resolutionNote ?? undefined,
-      source: (source as 'web' | 'gmail') || 'web',
+      source: source === 'gmail' || row.source === 'gmail' ? 'gmail' : 'web',
     };
   }
 
@@ -259,9 +286,10 @@ export class SupabaseService {
 
     return {
       ...rest,
+      status: this.normalizeStatus(task.status),
       order: typeof task.order === 'number' ? task.order : (indexFallback ?? 0),
       recurrence: task.recurrence || 'single',
-      updatedAt: new Date().toISOString(),
+      updatedAt: task.updatedAt || new Date().toISOString(),
       gmail_thread_id: gmailThreadId ?? null,
       email_message_id: emailMessageId ?? null,
       email_subject: emailSubject ?? null,
@@ -269,7 +297,7 @@ export class SupabaseService {
       email_to: emailTo ?? null,
       email_cc: emailCc ?? null,
       resolution_note: resolutionNote ?? null,
-      source: source || 'web',
+      source: source === 'gmail' ? 'gmail' : 'web',
     };
   }
 
@@ -278,6 +306,8 @@ export class SupabaseService {
    */
   private static mapUpdatesToRow(updates: Partial<Task>): Record<string, any> {
     const {
+      id: _ignoredId,
+      createdAt: _ignoredCreatedAt,
       gmailThreadId,
       emailMessageId,
       emailSubject,
@@ -291,9 +321,12 @@ export class SupabaseService {
 
     const payload: Record<string, any> = {
       ...rest,
-      updatedAt: new Date().toISOString(),
+      updatedAt: updates.updatedAt || new Date().toISOString(),
     };
 
+    if ('status' in updates && updates.status !== undefined) {
+      payload.status = this.normalizeStatus(updates.status);
+    }
     if ('gmailThreadId' in updates) payload.gmail_thread_id = gmailThreadId ?? null;
     if ('emailMessageId' in updates) payload.email_message_id = emailMessageId ?? null;
     if ('emailSubject' in updates) payload.email_subject = emailSubject ?? null;
@@ -301,7 +334,7 @@ export class SupabaseService {
     if ('emailTo' in updates) payload.email_to = emailTo ?? null;
     if ('emailCc' in updates) payload.email_cc = emailCc ?? null;
     if ('resolutionNote' in updates) payload.resolution_note = resolutionNote ?? null;
-    if ('source' in updates) payload.source = source || 'web';
+    if ('source' in updates) payload.source = source === 'gmail' ? 'gmail' : 'web';
 
     return payload;
   }
@@ -352,18 +385,70 @@ export class SupabaseService {
   /**
    * Atualiza campos específicos de uma tarefa
    */
-  static async updateTask(id: string, updates: Partial<Task>): Promise<boolean> {
+  static async updateTask(
+    id: string,
+    updates: Partial<Task>
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const payload = this.mapUpdatesToRow(updates);
-      const { error } = await supabase.from('tasks').update(payload).eq('id', id);
+      const { data, error } = await supabase
+        .from('tasks')
+        .update(payload)
+        .eq('id', id)
+        .select('id, status, updatedAt');
+
       if (error) {
-        console.warn('Supabase updateTask error:', error.message);
-        return false;
+        console.error('[SupabaseService.updateTask] Erro ao atualizar tarefa no Supabase:', {
+          id,
+          payload,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+
+        // Fallback caso alguma coluna adicional (ex: Gmail) ainda não exista no banco, garantindo que o status seja persistido
+        const isMissingColumnError =
+          error.code === '42703' ||
+          error.code === 'PGRST204' ||
+          error.message?.toLowerCase().includes('column');
+
+        if (isMissingColumnError && 'status' in payload) {
+          const corePayload: Record<string, any> = {
+            status: payload.status,
+            updatedAt: payload.updatedAt,
+          };
+          const { error: fallbackError } = await supabase
+            .from('tasks')
+            .update(corePayload)
+            .eq('id', id);
+
+          if (!fallbackError) {
+            return {
+              success: false,
+              error: `Status salvo, mas há coluna ausente no banco: ${error.message}`,
+            };
+          }
+          console.error('[SupabaseService.updateTask] Erro também no fallback de status:', fallbackError);
+        }
+
+        return { success: false, error: error.message };
       }
-      return true;
-    } catch (err) {
-      console.warn('Supabase updateTask error:', err);
-      return false;
+
+      if (!data || data.length === 0) {
+        const notFoundMsg = `Nenhuma linha atualizada no Supabase para a tarefa "${id}".`;
+        console.warn('[SupabaseService.updateTask]', notFoundMsg);
+        return { success: false, error: notFoundMsg };
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[SupabaseService.updateTask] Exceção inesperada ao atualizar tarefa:', {
+        id,
+        error: err,
+      });
+      return { success: false, error: msg };
     }
   }
 
